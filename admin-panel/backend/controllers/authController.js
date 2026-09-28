@@ -1,5 +1,5 @@
 const bcrypt = require('bcryptjs');
-const { initFirebase } = require('../config/firebase');
+const { initFirebase, formatFirestoreError } = require('../config/firebase');
 const { signToken, ok, fail } = require('../middleware/auth');
 
 // Tiny in-code login throttle (keeps deps minimal — no extra package):
@@ -38,8 +38,9 @@ async function login(req, res) {
     const token = signToken(adminDoc);
     return ok(res, { token, expiresIn: process.env.JWT_EXPIRES_IN || '2h' }, 'Login successful.');
   } catch (err) {
-    const reason = String((err && err.message) || 'unknown error').split('\n')[0].replace(/\s+/g, ' ').trim().slice(0, 120);
-    console.error('Login error: ' + (reason || 'unknown error'));
+    // Log the FULL Firestore error (code + message + details): the resource
+    // path in 5 NOT_FOUND errors names the missing database.
+    console.error('Login error: ' + formatFirestoreError(err));
     return fail(res, 500, 'Login service error. Check server logs.');
   }
 }
