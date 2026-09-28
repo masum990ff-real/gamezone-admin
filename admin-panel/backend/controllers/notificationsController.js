@@ -1,4 +1,4 @@
-const admin = require('firebase-admin');
+const { FieldValue } = require('firebase-admin/firestore');
 const { initFirebase } = require('../config/firebase');
 const { ok, created, fail, plain } = require('../util/respond');
 
@@ -37,7 +37,7 @@ async function send(req, res) {
       title: cleanTitle,
       body: cleanBody,
       imageUrl: cleanImage,
-      sentAt: admin.firestore.FieldValue.serverTimestamp(),
+      sentAt: FieldValue.serverTimestamp(),
       sentBy: (req.admin && req.admin.email) || 'admin',
       successCount: 1,
       failureCount: 0,
@@ -52,7 +52,7 @@ async function send(req, res) {
         title: cleanTitle,
         body: cleanBody,
         imageUrl: cleanImage,
-        sentAt: admin.firestore.FieldValue.serverTimestamp(),
+        sentAt: FieldValue.serverTimestamp(),
         sentBy: (req.admin && req.admin.email) || 'admin',
         successCount: 0,
         failureCount: 1,
@@ -100,7 +100,7 @@ async function createTemplate(req, res) {
       title: String(title).trim(),
       body: String(body).trim(),
       imageUrl: imageUrl ? String(imageUrl).trim() : '',
-      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      createdAt: FieldValue.serverTimestamp(),
     });
     const doc = await ref.get();
     return created(res, plain({ id: doc.id, ...doc.data() }), 'Template saved.');
