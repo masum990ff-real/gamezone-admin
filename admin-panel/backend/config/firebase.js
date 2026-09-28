@@ -9,6 +9,15 @@ const { getMessaging } = require('firebase-admin/messaging');
 // Expected GCP project — compared by NAME only. Never log secrets.
 const EXPECTED_PROJECT_ID = 'game-zone-esports-77';
 
+// Firestore database ID — defaults to '(default)'. Set FIRESTORE_DATABASE_ID
+// only if the Firebase console shows a different database ID for this project.
+// NOTE: only Standard edition databases are reachable by this backend;
+// Enterprise edition databases are NOT reachable via getFirestore().
+function getFirestoreDatabaseId() {
+  const raw = String(process.env.FIRESTORE_DATABASE_ID || '').trim();
+  return raw || '(default)';
+}
+
 // Module-level status: names/reasons only, never secret values.
 // reason: null | 'missing_env' | 'bad_json' | 'missing_field:<name>'
 //       | 'bad_key:<sanitized-msg>' | 'wrong_project:<id>'
@@ -29,6 +38,29 @@ function sanitizeMsg(msg) {
     .trim();
   if (s.length > 120) s = s.slice(0, 120);
   return s || 'unknown error';
+}
+
+// Full Firestore error formatter for server logs (seed/login/health paths).
+// Firestore error messages contain resource paths, never credentials, so the
+// FULL code + message + details are logged — earlier 120-char truncation hid
+// the database/resource name in gRPC 5 NOT_FOUND errors. Never pass env
+// values or key material into this; err objects only.
+function formatFirestoreError(err) {
+  const code = err && err.code !== undefined ? String(err.code) : 'unknown';
+  let msg = String((err && err.message) || 'unknown error');
+  msg = msg.replace(/-----BEGIN[^-]*-----/g, '[key]')
+    .replace(/-----END[^-]*-----/g, '[key]')
+    .replace(/\s+/g, ' ')
+    .trim();
+  let details = '';
+  try {
+    if (err && err.details !== undefined && err.details !== null && String(err.details).trim()) {
+      details = ' | details: ' + String(err.details).replace(/\s+/g, ' ').trim();
+    }
+  } catch (ignored) {
+    // details are best-effort only
+  }
+  return 'code ' + code + ': ' + (msg || 'unknown error') + details;
 }
 
 // Strip ONE layer of surrounding matching single/double quotes.
@@ -139,20 +171,23 @@ function initFirebase() {
   }
   try {
     // initializeApp with a credential is not idempotent — guard with getApps().
+    let app;
     if (getApps().length === 0) {
-      initializeApp({ credential: cert(serviceAccount) });
+      app = initializeApp({ credential: cert(serviceAccount) });
+    } else {
+      app = getApps()[0];
     }
+    db = getFirestore(app, getFirestoreDatabaseId());
+    messaging = getMessaging(app);
+    auth = getAuth(app);
   } catch (err) {
     firebaseStatus.initialized = false;
     firebaseStatus.reason = 'bad_key:' + sanitizeMsg(err && err.message);
     throw new Error('Firebase not configured (bad_key).');
   }
-  db = getFirestore();
-  messaging = getMessaging();
-  auth = getAuth();
   firebaseStatus.initialized = true;
   firebaseStatus.reason = null;
   return { db, messaging, auth };
 }
 
-module.exports = { initFirebase, firebaseStatus, EXPECTED_PROJECT_ID };
+module.exports = { initFirebase, firebaseStatus, EXPECTED_PROJECT_ID, getFirestoreDatabaseId, formatFirestoreError };
