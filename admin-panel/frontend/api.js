@@ -1,18 +1,18 @@
 // All admin API calls go through here (rules.md section 5). The JWT lives in
-// sessionStorage (cleared when the tab closes). The API base is hardcoded so a
-// mistyped URL can never break login.
+// localStorage so the admin session survives tab closes (7-day server expiry).
+// The API base is hardcoded so a mistyped URL can never break login.
 const Api = (() => {
   const API_BASE = 'https://gamezone-admin-5skm.onrender.com/api/v1';
   const TOKEN_KEY = 'gz_admin_token';
 
   function token() {
-    return sessionStorage.getItem(TOKEN_KEY);
+    return localStorage.getItem(TOKEN_KEY);
   }
   function isLoggedIn() {
     return !!token();
   }
   function logout() {
-    sessionStorage.removeItem(TOKEN_KEY);
+    localStorage.removeItem(TOKEN_KEY);
     window.location.href = 'login.html';
   }
   // Call on every protected page; bounces to login when there is no token.
@@ -59,7 +59,7 @@ const Api = (() => {
 
   async function login(email, password) {
     const data = await post('/auth/login', { email, password });
-    sessionStorage.setItem(TOKEN_KEY, data.token);
+    localStorage.setItem(TOKEN_KEY, data.token);
     return data;
   }
 
