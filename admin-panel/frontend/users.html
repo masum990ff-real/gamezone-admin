@@ -10,7 +10,9 @@
   .card { background: #14161B; border: 1px solid #262B33; }
   .accent { color: #FF7A00; }
   .nav-active { background: #1C1214; border-color: #FF7A00 !important; color: #FF7A00; }
-  table th, table td { padding: 10px 12px; text-align: left; white-space: nowrap; }
+  .btn-primary { background: #00E676; color: #06110B; }
+  .btn-danger { background: #7F1D1D; color: #FECACA; border: 1px solid #B91C1C; }
+  table th, table td { padding: 10px 12px; text-align: left; }
 </style>
 </head>
 <body class="min-h-screen text-gray-100">
@@ -23,10 +25,11 @@
     <button id="logoutBtn" class="mt-auto rounded-lg px-3 py-2 text-left text-gray-400 hover:bg-gray-900">Logout</button>
   </aside>
   <main class="flex-1 p-6">
-    <h2 class="text-2xl font-bold mb-2">Users</h2>
+    <h2 class="text-2xl font-bold mb-6">Users</h2>
     <p class="text-sm text-gray-400 mb-4">Passwords live only in Firebase Authentication (hashed by Google) and are never stored or shown here. Bans take effect on the user&apos;s next login or app start.</p>
     <div id="errorBox" class="hidden mb-4 text-sm text-red-300 bg-red-950 border border-red-800 rounded-lg px-3 py-2"></div>
-    <div class="card rounded-2xl p-4 overflow-x-auto">
+    <div class="card rounded-2xl p-5">
+      <div class="overflow-x-auto">
       <table class="w-full text-sm">
         <thead class="text-gray-400">
           <tr class="border-b border-gray-800">
@@ -36,6 +39,7 @@
         </thead>
         <tbody id="userRows"><tr><td colspan="9" class="text-gray-500">Loading...</td></tr></tbody>
       </table>
+      </div>
     </div>
     <div class="flex items-center gap-3 mt-4 text-sm">
       <button id="prevBtn" class="card rounded-lg px-4 py-2">Previous</button>
@@ -85,8 +89,8 @@
           : '<span class="text-green-400">Active</span>') + '</td>' +
         '<td class="text-gray-400">' + esc(fmtDate(u.createdAt)) + '</td>' +
         '<td>' + (u.isBanned
-          ? '<button data-unban="' + esc(u.id) + '" class="text-green-400 underline">Unban</button>'
-          : '<button data-ban="' + esc(u.id) + '" class="text-red-400 underline">Ban</button>') + '</td></tr>'
+          ? '<button data-unban="' + esc(u.id) + '" class="btn-primary font-bold rounded-lg px-3 py-1 text-sm">Unban</button>'
+          : '<button data-ban="' + esc(u.id) + '" class="btn-danger font-bold rounded-lg px-3 py-1 text-sm">Ban</button>') + '</td></tr>'
       ).join('') : '<tr><td colspan="9" class="text-gray-500">No users found.</td></tr>';
       userRows.querySelectorAll('[data-ban]').forEach((btn) =>
         btn.addEventListener('click', () => banUser(btn.getAttribute('data-ban'))));
