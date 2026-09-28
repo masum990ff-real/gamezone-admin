@@ -19,8 +19,6 @@
     <h1 class="text-3xl font-extrabold tracking-wide">GAME <span class="accent">ZONE</span></h1>
     <p class="text-sm text-gray-400 mt-1 mb-6">Admin Panel — sign in to continue</p>
     <div id="errorBox" class="hidden mb-4 text-sm text-red-300 bg-red-950 border border-red-800 rounded-lg px-3 py-2"></div>
-    <label class="block text-sm text-gray-400 mb-1" for="apiBase">Backend API base URL</label>
-    <input id="apiBase" type="text" class="field rounded-lg w-full px-3 py-2 mb-4 text-sm" />
     <label class="block text-sm text-gray-400 mb-1" for="email">Email</label>
     <input id="email" type="email" autocomplete="username" class="field rounded-lg w-full px-3 py-2 mb-4 text-sm" placeholder="admin@example.com" />
     <label class="block text-sm text-gray-400 mb-1" for="password">Password</label>
@@ -29,12 +27,10 @@
   </div>
 <script src="api.js"></script>
 <script>
-  const apiBaseEl = document.getElementById('apiBase');
   const emailEl = document.getElementById('email');
   const passwordEl = document.getElementById('password');
   const loginBtn = document.getElementById('loginBtn');
   const errorBox = document.getElementById('errorBox');
-  apiBaseEl.value = Api.base();
   if (Api.isLoggedIn()) window.location.href = 'index.html';
 
   function showError(msg) {
@@ -43,7 +39,6 @@
   }
   async function doLogin() {
     errorBox.classList.add('hidden');
-    Api.setBase(apiBaseEl.value.trim());
     loginBtn.disabled = true;
     loginBtn.textContent = 'Signing in...';
     try {
