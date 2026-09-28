@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Game Zone Admin — Login</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  body { background: #050505; }
+  .card { background: #14161B; border: 1px solid #262B33; }
+  .accent { color: #FF7A00; }
+  .btn-primary { background: #00E676; color: #06110B; }
+  .btn-primary:disabled { opacity: .5; }
+  .field { background: #0B0D10; border: 1px solid #2A2E35; color: #F2F4F7; }
+</style>
+</head>
+<body class="min-h-screen flex items-center justify-center text-gray-100">
+  <div class="card rounded-2xl p-8 w-full max-w-md shadow-2xl">
+    <h1 class="text-3xl font-extrabold tracking-wide">GAME <span class="accent">ZONE</span></h1>
+    <p class="text-sm text-gray-400 mt-1 mb-6">Admin Panel — sign in to continue</p>
+    <div id="errorBox" class="hidden mb-4 text-sm text-red-300 bg-red-950 border border-red-800 rounded-lg px-3 py-2"></div>
+    <label class="block text-sm text-gray-400 mb-1" for="apiBase">Backend API base URL</label>
+    <input id="apiBase" type="text" class="field rounded-lg w-full px-3 py-2 mb-4 text-sm" />
+    <label class="block text-sm text-gray-400 mb-1" for="email">Email</label>
+    <input id="email" type="email" autocomplete="username" class="field rounded-lg w-full px-3 py-2 mb-4 text-sm" placeholder="admin@example.com" />
+    <label class="block text-sm text-gray-400 mb-1" for="password">Password</label>
+    <input id="password" type="password" autocomplete="current-password" class="field rounded-lg w-full px-3 py-2 mb-6 text-sm" placeholder="••••••••" />
+    <button id="loginBtn" class="btn-primary font-bold rounded-xl w-full py-3">Login</button>
+  </div>
+<script src="api.js"></script>
+<script>
+  const apiBaseEl = document.getElementById('apiBase');
+  const emailEl = document.getElementById('email');
+  const passwordEl = document.getElementById('password');
+  const loginBtn = document.getElementById('loginBtn');
+  const errorBox = document.getElementById('errorBox');
+  apiBaseEl.value = Api.base();
+  if (Api.isLoggedIn()) window.location.href = 'index.html';
+
+  function showError(msg) {
+    errorBox.textContent = msg;
+    errorBox.classList.remove('hidden');
+  }
+  async function doLogin() {
+    errorBox.classList.add('hidden');
+    Api.setBase(apiBaseEl.value.trim());
+    loginBtn.disabled = true;
+    loginBtn.textContent = 'Signing in...';
+    try {
+      await Api.login(emailEl.value.trim(), passwordEl.value);
+      window.location.href = 'index.html';
+    } catch (err) {
+      showError(err.message);
+    } finally {
+      loginBtn.disabled = false;
+      loginBtn.textContent = 'Login';
+    }
+  }
+  loginBtn.addEventListener('click', doLogin);
+  passwordEl.addEventListener('keydown', (e) => { if (e.key === 'Enter') doLogin(); });
+</script>
+</body>
+</html>
