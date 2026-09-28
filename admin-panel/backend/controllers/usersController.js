@@ -1,4 +1,4 @@
-const admin = require('firebase-admin');
+const { FieldValue } = require('firebase-admin/firestore');
 const { initFirebase } = require('../config/firebase');
 const { ok, fail, plain } = require('../util/respond');
 
@@ -45,7 +45,7 @@ async function ban(req, res) {
     await ref.update({
       isBanned: true,
       banReason: reason,
-      bannedAt: admin.firestore.FieldValue.serverTimestamp(),
+      bannedAt: FieldValue.serverTimestamp(),
     });
     try {
       await auth.revokeRefreshTokens(req.params.id);
@@ -67,7 +67,7 @@ async function unban(req, res) {
     await ref.update({
       isBanned: false,
       banReason: '',
-      unbannedAt: admin.firestore.FieldValue.serverTimestamp(),
+      unbannedAt: FieldValue.serverTimestamp(),
     });
     return ok(res, { id: req.params.id, isBanned: false }, 'User unbanned.');
   } catch (err) {
