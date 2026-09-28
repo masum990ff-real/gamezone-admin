@@ -111,12 +111,25 @@ function checkEnv() {
   if (!process.env.ADMIN_SEED_PASSWORD) console.error('[config] ADMIN_SEED_PASSWORD is not set. First-run auto-seed is disabled.');
 }
 
-// Free-plan first-run bootstrap (no Shell needed): logs the admins-collection
-// count, then if EMPTY and ADMIN_SEED_EMAIL + ADMIN_SEED_PASSWORD (8+ chars)
-// are set, creates the first admin once. Every outcome logs one clear line
-// (names only, never secrets) so free-plan Logs alone diagnose login failures.
-// Passwords are never logged — only the email, and only on creation.
+// Free-plan first-run bootstrap (no Shell needed): upserts the seed admin by
+// EXACT email on every boot — creates the doc if missing, leaves an existing
+// one untouched. Every outcome logs one clear line (names only, never secrets)
+// so free-plan Logs alone diagnose login failures. Fixing a typo'd
+// ADMIN_SEED_EMAIL means correcting the env var and redeploying, which then
+// creates the correct admin. Passwords are never logged — only the email, and
+// only on creation. NOTE: scripts/seedAdmin.js (Shell) instead RESETS the
+// password on an existing email — intentionally different; do not "align" this.
 async function autoSeedAdmin() {
+  const email = String(process.env.ADMIN_SEED_EMAIL || '').trim().toLowerCase();
+  const password = String(process.env.ADMIN_SEED_PASSWORD || '');
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    console.log('Auto-seed skipped: ADMIN_SEED_EMAIL is not a valid email address');
+    return;
+  }
+  if (password.length < 8) {
+    console.log('Auto-seed skipped: ADMIN_SEED_PASSWORD must be at least 8 characters.');
+    return;
+  }
   let seedDb;
   try {
     ({ db: seedDb } = initFirebase());
@@ -125,17 +138,9 @@ async function autoSeedAdmin() {
     return; // cause already logged by checkEnv() and visible in GET /health
   }
   try {
-    const snap = await seedDb.collection('admins').get();
-    const count = snap.size;
-    console.log('Existing admins in DB: ' + count);
-    if (count > 0) {
-      console.log('Auto-seed skipped: ' + count + ' admin(s) already exist');
-      return;
-    }
-    const email = String(process.env.ADMIN_SEED_EMAIL || '').trim().toLowerCase();
-    const password = String(process.env.ADMIN_SEED_PASSWORD || '');
-    if (!email || password.length < 8) {
-      console.log('Auto-seed skipped: ADMIN_SEED_EMAIL/ADMIN_SEED_PASSWORD not set');
+    const snap = await seedDb.collection('admins').where('email', '==', email).limit(1).get();
+    if (!snap.empty) {
+      console.log('Admin ' + email + ' already exists (not modified)');
       return;
     }
     const role = String(process.env.ADMIN_SEED_ROLE || 'superadmin').trim() || 'superadmin';
@@ -146,7 +151,7 @@ async function autoSeedAdmin() {
       role,
       createdAt: new Date().toISOString(),
     });
-    console.log('Admin auto-created for ' + email + ' (first run only)');
+    console.log('Admin auto-created for ' + email);
   } catch (err) {
     // Log the FULL Firestore error (code + message + details): the resource
     // path in 5 NOT_FOUND errors names the missing database. Free plan has
