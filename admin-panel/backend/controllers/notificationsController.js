@@ -25,7 +25,19 @@ async function send(req, res) {
       topic: 'all_users',
       notification: { title: cleanTitle, body: cleanBody },
       data: { title: cleanTitle, body: cleanBody },
-      android: { priority: 'high', notification: { channelId: 'gamezone_updates' } },
+      android: {
+        priority: 'high',
+        ttl: '60s',
+        notification: {
+          channelId: 'gamezone_fcm',
+          sound: 'default',
+          visibility: 'public',
+        },
+      },
+      apns: {
+        headers: { 'apns-priority': '10' },
+        payload: { aps: { sound: 'default', badge: 1, 'mutable-content': 1 } },
+      },
     };
     if (cleanImage) {
       message.notification.imageUrl = cleanImage;
