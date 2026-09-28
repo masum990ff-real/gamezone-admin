@@ -36,7 +36,7 @@ async function login(req, res) {
     const match = await bcrypt.compare(String(password), adminDoc.passwordHash || '');
     if (!match) return fail(res, 401, 'Invalid email or password.');
     const token = signToken(adminDoc);
-    return ok(res, { token, expiresIn: process.env.JWT_EXPIRES_IN || '2h' }, 'Login successful.');
+    return ok(res, { token, expiresIn: process.env.JWT_EXPIRES_IN || '7d' }, 'Login successful.');
   } catch (err) {
     // Log the FULL Firestore error (code + message + details): the resource
     // path in 5 NOT_FOUND errors names the missing database.
