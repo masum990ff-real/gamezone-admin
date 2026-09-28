@@ -21,8 +21,14 @@ async function login(req, res) {
   if (throttled(req.ip)) return fail(res, 429, 'Too many login attempts. Please try again in 15 minutes.');
   const { email, password } = req.body || {};
   if (!email || !password) return fail(res, 400, 'Email and password are required.');
+  let db;
   try {
-    const { db } = initFirebase();
+    ({ db } = initFirebase());
+  } catch (ignored) {
+    return fail(res, 500, 'Server not configured. Contact administrator.');
+  }
+  if (!process.env.JWT_SECRET) return fail(res, 500, 'Server not configured. Contact administrator.');
+  try {
     const snap = await db.collection('admins').where('email', '==', String(email).trim().toLowerCase()).limit(1).get();
     if (snap.empty) return fail(res, 401, 'Invalid email or password.');
     const doc = snap.docs[0];
