@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Game Zone Admin — Dashboard</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  body { background: #050505; }
+  .card { background: #14161B; border: 1px solid #262B33; }
+  .accent { color: #FF7A00; }
+  .nav-active { background: #1C1214; border-color: #FF7A00 !important; color: #FF7A00; }
+</style>
+</head>
+<body class="min-h-screen text-gray-100">
+<div class="flex min-h-screen">
+  <aside class="w-56 shrink-0 border-r border-gray-800 p-4 flex flex-col gap-2">
+    <h1 class="text-xl font-extrabold tracking-wide px-2 mb-4">GAME <span class="accent">ZONE</span></h1>
+    <a href="index.html" class="nav-active rounded-lg px-3 py-2 border border-transparent">Dashboard</a>
+    <a href="users.html" class="rounded-lg px-3 py-2 border border-transparent text-gray-300 hover:bg-gray-900">Users</a>
+    <a href="notifications.html" class="rounded-lg px-3 py-2 border border-transparent text-gray-300 hover:bg-gray-900">Notifications</a>
+    <button id="logoutBtn" class="mt-auto rounded-lg px-3 py-2 text-left text-gray-400 hover:bg-gray-900">Logout</button>
+  </aside>
+  <main class="flex-1 p-6">
+    <h2 class="text-2xl font-bold mb-6">Dashboard</h2>
+    <div id="errorBox" class="hidden mb-4 text-sm text-red-300 bg-red-950 border border-red-800 rounded-lg px-3 py-2"></div>
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
+      <div class="card rounded-2xl p-5">
+        <p class="text-sm text-gray-400">Total users</p>
+        <p id="statTotal" class="text-4xl font-extrabold mt-1">—</p>
+      </div>
+      <div class="card rounded-2xl p-5">
+        <p class="text-sm text-gray-400">Joined today</p>
+        <p id="statToday" class="text-4xl font-extrabold mt-1 text-green-400">—</p>
+      </div>
+      <div class="card rounded-2xl p-5">
+        <p class="text-sm text-gray-400">Joined last 7 days</p>
+        <p id="statWeek" class="text-4xl font-extrabold mt-1 accent">—</p>
+      </div>
+    </div>
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      <div class="card rounded-2xl p-5">
+        <h3 class="font-bold mb-3">Newest users</h3>
+        <div id="newestUsers" class="text-sm text-gray-300">Loading...</div>
+      </div>
+      <div class="card rounded-2xl p-5">
+        <h3 class="font-bold mb-3">Recent broadcasts</h3>
+        <div id="recentNotes" class="text-sm text-gray-300">Loading...</div>
+      </div>
+    </div>
+  </main>
+</div>
+<script src="api.js"></script>
+<script>
+  Api.requireAuth();
+  document.getElementById('logoutBtn').addEventListener('click', () => Api.logout());
+  const errorBox = document.getElementById('errorBox');
+  function showError(msg) {
+    errorBox.textContent = msg;
+    errorBox.classList.remove('hidden');
+  }
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+    }[c]));
+  }
+  async function load() {
+    try {
+      const stats = await Api.get('/dashboard/stats');
+      document.getElementById('statTotal').textContent = stats.totalUsers;
+      document.getElementById('statToday').textContent = stats.joinedToday;
+      document.getElementById('statWeek').textContent = stats.joinedWeek;
+      const users = await Api.get('/users?page=1&limit=5');
+      document.getElementById('newestUsers').innerHTML = users.users.length
+        ? '<ul class="space-y-2">' + users.users.map((u) =>
+            '<li class="flex justify-between border-b border-gray-800 pb-2"><span>' +
+            esc(u.username || u.email) + '</span><span class="text-gray-500">' + esc(u.email || '') + '</span></li>').join('') + '</ul>'
+        : 'No users yet.';
+      const notes = await Api.get('/notifications/history?page=1&limit=5');
+      document.getElementById('recentNotes').innerHTML = notes.notifications.length
+        ? '<ul class="space-y-2">' + notes.notifications.map((n) =>
+            '<li class="flex justify-between border-b border-gray-800 pb-2"><span>' +
+            esc(n.title) + '</span><span class="text-gray-500">sent ' + n.successCount + ' / failed ' + n.failureCount + '</span></li>').join('') + '</ul>'
+        : 'No broadcasts yet.';
+    } catch (err) {
+      showError(err.message);
+    }
+  }
+  load();
+</script>
+</body>
+</html>
