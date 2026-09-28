@@ -4,7 +4,7 @@ const path = require('path');
 const cors = require('cors');
 const bcrypt = require('bcryptjs');
 const { fail } = require('./util/respond');
-const { initFirebase, firebaseStatus } = require('./config/firebase');
+const { initFirebase, firebaseStatus, formatFirestoreError } = require('./config/firebase');
 
 const authRoutes = require('./routes/auth');
 const userRoutes = require('./routes/users');
@@ -22,19 +22,36 @@ const frontendDir = path.join(__dirname, '..', 'frontend');
 app.use(express.static(frontendDir, { index: false }));
 app.get('/', (req, res) => res.sendFile(path.join(frontendDir, 'login.html')));
 
-app.get('/health', (req, res) => {
+app.get('/health', async (req, res) => {
   let firebase = false;
+  let db = null;
   try {
-    initFirebase();
+    ({ db } = initFirebase());
     firebase = true;
   } catch (ignored) {
     firebase = false;
   }
   const firebaseReason = firebase ? null : firebaseStatus.reason;
+  // Firestore reachability: cheap admins limit(1) read. Init can succeed
+  // while every data call fails (e.g. gRPC 5 NOT_FOUND when the target
+  // database does not exist), so report reachability separately.
+  let firestore = false;
+  let firestoreReason = null;
+  if (db) {
+    try {
+      await db.collection('admins').limit(1).get();
+      firestore = true;
+    } catch (err) {
+      firestoreReason = formatFirestoreError(err);
+      console.error('Health Firestore check failed: ' + firestoreReason);
+    }
+  } else {
+    firestoreReason = firebaseReason;
+  }
   return res.json({
     success: true,
-    data: { ok: true, firebase, firebaseReason },
-    message: firebase ? '' : 'Firebase is not configured. Set FIREBASE_SERVICE_ACCOUNT.',
+    data: { ok: true, firebase, firebaseReason, firestore, firestoreReason },
+    message: firebase ? (firestore ? '' : 'Firestore is not reachable. Check server logs.') : 'Firebase is not configured. Set FIREBASE_SERVICE_ACCOUNT.',
   });
 });
 
@@ -90,8 +107,8 @@ function checkEnv() {
       console.error('[config] FIREBASE_SERVICE_ACCOUNT not configured (' + r + ').');
     }
   }
-  if (!process.env.ADMIN_SEED_EMAIL) console.error('[config] ADMIN_SEED_EMAIL is not set. First-run auto-seed is disabled (or run npm run seed:admin in Shell).');
-  if (!process.env.ADMIN_SEED_PASSWORD) console.error('[config] ADMIN_SEED_PASSWORD is not set. First-run auto-seed is disabled (or run npm run seed:admin in Shell).');
+  if (!process.env.ADMIN_SEED_EMAIL) console.error('[config] ADMIN_SEED_EMAIL is not set. First-run auto-seed is disabled.');
+  if (!process.env.ADMIN_SEED_PASSWORD) console.error('[config] ADMIN_SEED_PASSWORD is not set. First-run auto-seed is disabled.');
 }
 
 // Free-plan first-run bootstrap (no Shell needed): logs the admins-collection
@@ -131,7 +148,9 @@ async function autoSeedAdmin() {
     });
     console.log('Admin auto-created for ' + email + ' (first run only)');
   } catch (err) {
-    const msg = String((err && err.message) || 'unknown error').split('\n')[0].replace(/\s+/g, ' ').trim().slice(0, 120);
-    console.error('Admin auto-seed skipped (' + (msg || 'unknown error') + '). Fix env vars and redeploy, or run npm run seed:admin in Shell.');
+    // Log the FULL Firestore error (code + message + details): the resource
+    // path in 5 NOT_FOUND errors names the missing database. Free plan has
+    // no Shell — fix env vars and redeploy.
+    console.error('Admin auto-seed skipped (' + formatFirestoreError(err) + '). Fix env vars and redeploy.');
   }
 }
