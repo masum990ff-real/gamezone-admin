@@ -1,5 +1,5 @@
 const { FieldValue } = require('firebase-admin/firestore');
-const { initFirebase } = require('../config/firebase');
+const { initFirebase, formatFirestoreError } = require('../config/firebase');
 const { ok, created, fail, plain } = require('../util/respond');
 
 function pageParams(req) {
@@ -19,6 +19,9 @@ async function send(req, res) {
   const cleanTitle = String(title).trim();
   const cleanBody = String(body).trim();
   const cleanImage = imageUrl ? String(imageUrl).trim() : '';
+  // Only a non-empty http(s) URL may enter the FCM payload — an empty or
+  // non-URL string fails FCM validation and rejects the whole send.
+  const hasImage = cleanImage.startsWith('http');
   try {
     const { db, messaging } = initFirebase();
     const message = {
@@ -27,7 +30,7 @@ async function send(req, res) {
       data: { title: cleanTitle, body: cleanBody },
       android: {
         priority: 'high',
-        ttl: '60s',
+        ttl: 60000,
         notification: {
           channelId: 'gamezone_fcm',
           sound: 'default',
@@ -39,7 +42,7 @@ async function send(req, res) {
         payload: { aps: { sound: 'default', badge: 1, 'mutable-content': 1 } },
       },
     };
-    if (cleanImage) {
+    if (hasImage) {
       message.notification.imageUrl = cleanImage;
       message.data.imageUrl = cleanImage;
       message.android.notification.imageUrl = cleanImage;
@@ -58,6 +61,8 @@ async function send(req, res) {
     await db.collection('notifications_history').add(record);
     return ok(res, { messageId, successCount: 1, failureCount: 0 }, 'Notification sent.');
   } catch (err) {
+    const reason = formatFirestoreError(err);
+    console.error('Broadcast send failed: ' + reason);
     try {
       const { db } = initFirebase();
       await db.collection('notifications_history').add({
@@ -73,7 +78,7 @@ async function send(req, res) {
     } catch (ignored) {
       // History logging must never mask the original send error.
     }
-    return fail(res, 500, 'Notification could not be sent.');
+    return fail(res, 500, 'Notification could not be sent: ' + reason);
   }
 }
 
