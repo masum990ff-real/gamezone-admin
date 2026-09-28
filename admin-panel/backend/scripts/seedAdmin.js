@@ -1,7 +1,7 @@
 const bcrypt = require('bcryptjs');
 const path = require('path');
 require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
-const { initFirebase } = require('../config/firebase');
+const { initFirebase, firebaseStatus } = require('../config/firebase');
 
 // First-admin bootstrap: hashes a password from env into admins/{id}.
 // There is intentionally NO public register route.
@@ -17,7 +17,13 @@ async function main() {
     console.error('ADMIN_SEED_PASSWORD must be at least 8 characters.');
     process.exit(1);
   }
-  const { db } = initFirebase();
+  let db;
+  try {
+    ({ db } = initFirebase());
+  } catch (err) {
+    console.error('Seed failed: Firebase is not configured (reason: ' + (firebaseStatus.reason || 'unknown') + '). Fix FIREBASE_SERVICE_ACCOUNT, redeploy, then re-run. Check server Logs for [config] lines and GET /health.');
+    process.exit(1);
+  }
   const passwordHash = await bcrypt.hash(password, 10);
   const snap = await db.collection('admins').where('email', '==', email).limit(1).get();
   if (snap.empty) {
