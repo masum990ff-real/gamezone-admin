@@ -1,0 +1,21 @@
+{
+  "name": "gamezone-admin-backend",
+  "version": "1.0.0",
+  "description": "Admin panel backend for the Game Zone Free Fire Tournament App (Node.js + Express + Firebase Admin SDK)",
+  "main": "server.js",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "start": "node server.js",
+    "seed:admin": "node scripts/seedAdmin.js"
+  },
+  "dependencies": {
+    "bcryptjs": "3.0.3",
+    "cors": "2.8.6",
+    "dotenv": "18.0.4",
+    "express": "5.2.1",
+    "firebase-admin": "14.3.0",
+    "jsonwebtoken": "9.0.3"
+  }
+}
