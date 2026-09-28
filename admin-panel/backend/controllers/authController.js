@@ -38,7 +38,9 @@ async function login(req, res) {
     const token = signToken(adminDoc);
     return ok(res, { token, expiresIn: process.env.JWT_EXPIRES_IN || '2h' }, 'Login successful.');
   } catch (err) {
-    return fail(res, 500, 'Login failed. Please try again.');
+    const reason = String((err && err.message) || 'unknown error').split('\n')[0].replace(/\s+/g, ' ').trim().slice(0, 120);
+    console.error('Login error: ' + (reason || 'unknown error'));
+    return fail(res, 500, 'Login service error. Check server logs.');
   }
 }
 
