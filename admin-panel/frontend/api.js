@@ -33,7 +33,7 @@ const Api = (() => {
     } catch (err) {
       throw new Error('Could not reach the backend. Check your internet connection and try again.');
     }
-    if (res.status === 401) {
+    if (res.status === 401 && path !== '/auth/login') {
       logout();
       throw new Error('Session expired. Please log in again.');
     }
