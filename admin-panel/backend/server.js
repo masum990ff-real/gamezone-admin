@@ -49,10 +49,20 @@ app.use((err, req, res, next) => fail(res, 500, 'Something went wrong.'));
 
 const PORT = parseInt(process.env.PORT, 10) || 3000;
 checkEnv();
-app.listen(PORT, () => {
-  console.log('GameZone admin backend listening on port ' + PORT);
-  autoSeedAdmin(); // free-plan first run: no Shell needed
-});
+// Await the seed read-then-write BEFORE listening so the first login attempt
+// never races the first-run admin creation. The server still starts even if
+// the seed check fails, so GET /health stays checkable.
+start();
+async function start() {
+  try {
+    await autoSeedAdmin(); // free-plan first run: no Shell needed
+  } catch (err) {
+    console.error('Auto-seed check failed.');
+  }
+  app.listen(PORT, () => {
+    console.log('GameZone admin backend listening on port ' + PORT);
+  });
+}
 
 // Boot-time config check: one clear single-line error per missing/invalid env.
 // Names and reasons only — never secret values.
@@ -84,23 +94,33 @@ function checkEnv() {
   if (!process.env.ADMIN_SEED_PASSWORD) console.error('[config] ADMIN_SEED_PASSWORD is not set. First-run auto-seed is disabled (or run npm run seed:admin in Shell).');
 }
 
-// Free-plan first-run bootstrap (no Shell needed): if ADMIN_SEED_EMAIL +
-// ADMIN_SEED_PASSWORD (8+ chars) are set AND the admins collection is EMPTY,
-// create the first admin once. Non-empty collection -> do nothing, log nothing.
+// Free-plan first-run bootstrap (no Shell needed): logs the admins-collection
+// count, then if EMPTY and ADMIN_SEED_EMAIL + ADMIN_SEED_PASSWORD (8+ chars)
+// are set, creates the first admin once. Every outcome logs one clear line
+// (names only, never secrets) so free-plan Logs alone diagnose login failures.
 // Passwords are never logged — only the email, and only on creation.
 async function autoSeedAdmin() {
-  const email = String(process.env.ADMIN_SEED_EMAIL || '').trim().toLowerCase();
-  const password = String(process.env.ADMIN_SEED_PASSWORD || '');
-  if (!email || password.length < 8) return;
   let seedDb;
   try {
     ({ db: seedDb } = initFirebase());
   } catch (ignored) {
+    console.error('Auto-seed skipped: Firebase not configured (' + (firebaseStatus.reason || 'unknown') + ').');
     return; // cause already logged by checkEnv() and visible in GET /health
   }
   try {
-    const snap = await seedDb.collection('admins').limit(1).get();
-    if (!snap.empty) return;
+    const snap = await seedDb.collection('admins').get();
+    const count = snap.size;
+    console.log('Existing admins in DB: ' + count);
+    if (count > 0) {
+      console.log('Auto-seed skipped: ' + count + ' admin(s) already exist');
+      return;
+    }
+    const email = String(process.env.ADMIN_SEED_EMAIL || '').trim().toLowerCase();
+    const password = String(process.env.ADMIN_SEED_PASSWORD || '');
+    if (!email || password.length < 8) {
+      console.log('Auto-seed skipped: ADMIN_SEED_EMAIL/ADMIN_SEED_PASSWORD not set');
+      return;
+    }
     const role = String(process.env.ADMIN_SEED_ROLE || 'superadmin').trim() || 'superadmin';
     const passwordHash = await bcrypt.hash(password, 10);
     await seedDb.collection('admins').add({
