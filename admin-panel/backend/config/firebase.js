@@ -1,4 +1,10 @@
-const admin = require('firebase-admin');
+// firebase-admin 14 modular API (verified against the installed 14.3.0
+// runtime): the default entry has NO .credential/.firestore/.auth/.messaging
+// namespaces, so init + services come from the documented subpath modules.
+const { initializeApp, cert, getApps } = require('firebase-admin/app');
+const { getFirestore } = require('firebase-admin/firestore');
+const { getAuth } = require('firebase-admin/auth');
+const { getMessaging } = require('firebase-admin/messaging');
 
 // Expected GCP project — compared by NAME only. Never log secrets.
 const EXPECTED_PROJECT_ID = 'game-zone-esports-77';
@@ -132,15 +138,18 @@ function initFirebase() {
     serviceAccount.private_key = serviceAccount.private_key.replace(/\\n/g, '\n');
   }
   try {
-    admin.initializeApp({ credential: admin.credential.cert(serviceAccount) });
+    // initializeApp with a credential is not idempotent — guard with getApps().
+    if (getApps().length === 0) {
+      initializeApp({ credential: cert(serviceAccount) });
+    }
   } catch (err) {
     firebaseStatus.initialized = false;
     firebaseStatus.reason = 'bad_key:' + sanitizeMsg(err && err.message);
     throw new Error('Firebase not configured (bad_key).');
   }
-  db = admin.firestore();
-  messaging = admin.messaging();
-  auth = admin.auth();
+  db = getFirestore();
+  messaging = getMessaging();
+  auth = getAuth();
   firebaseStatus.initialized = true;
   firebaseStatus.reason = null;
   return { db, messaging, auth };
