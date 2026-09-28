@@ -1,5 +1,6 @@
 require('dotenv').config();
 const express = require('express');
+const path = require('path');
 const cors = require('cors');
 const { fail } = require('./util/respond');
 
@@ -13,6 +14,11 @@ app.set('trust proxy', 1); // correct req.ip behind Render's proxy (login thrott
 app.use(cors({ origin: (process.env.CORS_ORIGIN || '*').split(',') }));
 app.use(express.json({ limit: '256kb' }));
 
+const frontendDir = path.join(__dirname, '..', 'frontend');
+// Static files only from frontend/ (index:false keeps / mapped to login.html below).
+app.use(express.static(frontendDir, { index: false }));
+app.get('/', (req, res) => res.sendFile(path.join(frontendDir, 'login.html')));
+
 app.get('/health', (req, res) => res.json({ success: true, data: { ok: true }, message: '' }));
 
 app.use('/api/v1/auth', authRoutes);
@@ -20,7 +26,8 @@ app.use('/api/v1/users', userRoutes);
 app.use('/api/v1/dashboard', dashboardRoutes);
 app.use('/api/v1/notifications', notificationRoutes);
 
-app.use((req, res) => fail(res, 404, 'Route not found.'));
+app.use('/api', (req, res) => fail(res, 404, 'Route not found.'));
+app.get(/.*/, (req, res) => res.sendFile(path.join(frontendDir, 'login.html')));
 app.use((err, req, res, next) => fail(res, 500, 'Something went wrong.'));
 
 const PORT = parseInt(process.env.PORT, 10) || 3000;
