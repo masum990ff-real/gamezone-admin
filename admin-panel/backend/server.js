@@ -3,7 +3,7 @@ const express = require('express');
 const path = require('path');
 const cors = require('cors');
 const { fail } = require('./util/respond');
-const { initFirebase } = require('./config/firebase');
+const { initFirebase, firebaseStatus } = require('./config/firebase');
 
 const authRoutes = require('./routes/auth');
 const userRoutes = require('./routes/users');
@@ -29,9 +29,10 @@ app.get('/health', (req, res) => {
   } catch (ignored) {
     firebase = false;
   }
+  const firebaseReason = firebase ? null : firebaseStatus.reason;
   return res.json({
     success: true,
-    data: { ok: true, firebase },
+    data: { ok: true, firebase, firebaseReason },
     message: firebase ? '' : 'Firebase is not configured. Set FIREBASE_SERVICE_ACCOUNT.',
   });
 });
@@ -52,17 +53,29 @@ app.listen(PORT, () => {
 });
 
 // Boot-time config check: one clear single-line error per missing/invalid env.
+// Names and reasons only — never secret values.
 // The server still starts so GET /health can report firebase:false in a browser.
 function checkEnv() {
   if (!process.env.JWT_SECRET) console.error('[config] JWT_SECRET is not set. Set a long random string (see .env.example).');
-  const raw = (process.env.FIREBASE_SERVICE_ACCOUNT || '').trim();
-  if (!raw) {
-    console.error('[config] FIREBASE_SERVICE_ACCOUNT is not set. Paste the service-account JSON on one line (see .env.example).');
-  } else if (raw.startsWith('{')) {
-    try {
-      JSON.parse(raw);
-    } catch (ignored) {
-      console.error('[config] FIREBASE_SERVICE_ACCOUNT is not valid JSON. Re-paste the service-account file content on one line.');
+  try {
+    initFirebase();
+  } catch (ignored) {
+    // firebaseStatus.reason now holds the precise cause.
+  }
+  if (!firebaseStatus.initialized) {
+    const r = firebaseStatus.reason || 'unknown';
+    if (r === 'missing_env') {
+      console.error('[config] FIREBASE_SERVICE_ACCOUNT is not set. Paste the service-account JSON on one line (see .env.example).');
+    } else if (r === 'bad_json') {
+      console.error('[config] FIREBASE_SERVICE_ACCOUNT is not valid JSON (or base64/file-path). Re-paste the service-account file content on one line.');
+    } else if (r.startsWith('missing_field:')) {
+      console.error('[config] FIREBASE_SERVICE_ACCOUNT ' + r + '. Re-paste the FULL service-account JSON with no edits.');
+    } else if (r.startsWith('bad_key:')) {
+      console.error('[config] FIREBASE_SERVICE_ACCOUNT ' + r + '. Check the private_key newlines (see .env.example).');
+    } else if (r.startsWith('wrong_project:')) {
+      console.error('[config] FIREBASE_SERVICE_ACCOUNT ' + r + '. Expected project game-zone-esports-77.');
+    } else {
+      console.error('[config] FIREBASE_SERVICE_ACCOUNT not configured (' + r + ').');
     }
   }
   if (!process.env.ADMIN_SEED_EMAIL) console.error('[config] ADMIN_SEED_EMAIL is not set. Seed (npm run seed:admin) cannot run without it.');
