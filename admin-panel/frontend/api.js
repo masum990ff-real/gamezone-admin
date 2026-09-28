@@ -1,12 +1,12 @@
 // All admin API calls go through here (rules.md section 5). The JWT lives in
-// sessionStorage (cleared when the tab closes); the API base URL is remembered
-// in localStorage so it survives reloads.
+// sessionStorage (cleared when the tab closes); the API base defaults to the
+// same origin (/api/v1) so the single Render service needs no CORS setup.
 const Api = (() => {
   const BASE_KEY = 'gz_api_base';
   const TOKEN_KEY = 'gz_admin_token';
 
   function base() {
-    return (localStorage.getItem(BASE_KEY) || 'http://localhost:3000/api/v1').replace(/\/$/, '');
+    return (localStorage.getItem(BASE_KEY) || '/api/v1').replace(/\/$/, '');
   }
   function setBase(url) {
     localStorage.setItem(BASE_KEY, String(url).replace(/\/$/, ''));
