@@ -1,16 +1,10 @@
 // All admin API calls go through here (rules.md section 5). The JWT lives in
-// sessionStorage (cleared when the tab closes); the API base defaults to the
-// same origin (/api/v1) so the single Render service needs no CORS setup.
+// sessionStorage (cleared when the tab closes). The API base is hardcoded so a
+// mistyped URL can never break login.
 const Api = (() => {
-  const BASE_KEY = 'gz_api_base';
+  const API_BASE = 'https://gamezone-admin-5skm.onrender.com/api/v1';
   const TOKEN_KEY = 'gz_admin_token';
 
-  function base() {
-    return (localStorage.getItem(BASE_KEY) || '/api/v1').replace(/\/$/, '');
-  }
-  function setBase(url) {
-    localStorage.setItem(BASE_KEY, String(url).replace(/\/$/, ''));
-  }
   function token() {
     return sessionStorage.getItem(TOKEN_KEY);
   }
@@ -35,9 +29,9 @@ const Api = (() => {
     if (options && options.body !== undefined) init.body = JSON.stringify(options.body);
     let res;
     try {
-      res = await fetch(base() + path, init);
+      res = await fetch(API_BASE + path, init);
     } catch (err) {
-      throw new Error('Could not reach the backend at ' + base() + '. Is it running?');
+      throw new Error('Could not reach the backend. Check your internet connection and try again.');
     }
     if (res.status === 401) {
       logout();
@@ -47,7 +41,7 @@ const Api = (() => {
     try {
       json = await res.json();
     } catch (err) {
-      throw new Error('Backend returned an invalid response.');
+      throw new Error('Backend error (HTTP ' + res.status + '). Please try again.');
     }
     if (!json.success) throw new Error(json.message || 'Request failed.');
     return json.data;
@@ -69,5 +63,5 @@ const Api = (() => {
     return data;
   }
 
-  return { base, setBase, token, isLoggedIn, logout, requireAuth, get, post, del, login };
+  return { token, isLoggedIn, logout, requireAuth, get, post, del, login };
 })();
