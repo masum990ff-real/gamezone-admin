@@ -4,126 +4,146 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Game Zone Admin — Users</title>
-<script src="https://cdn.tailwindcss.com"></script>
-<style>
-  body { background: #050505; }
-  .card { background: #14161B; border: 1px solid #262B33; }
-  .accent { color: #FF7A00; }
-  .nav-active { background: #1C1214; border-color: #FF7A00 !important; color: #FF7A00; }
-  .btn-primary { background: #00E676; color: #06110B; }
-  .btn-danger { background: #7F1D1D; color: #FECACA; border: 1px solid #B91C1C; }
-  table th, table td { padding: 10px 12px; text-align: left; }
-</style>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Rajdhani:wght@600;700&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="styles.css" />
 </head>
-<body class="min-h-screen text-gray-100">
-<div class="flex min-h-screen">
-  <aside class="w-56 shrink-0 border-r border-gray-800 p-4 flex flex-col gap-2">
-    <h1 class="text-xl font-extrabold tracking-wide px-2 mb-4">GAME <span class="accent">ZONE</span></h1>
-    <a href="index.html" class="rounded-lg px-3 py-2 border border-transparent text-gray-300 hover:bg-gray-900">Dashboard</a>
-    <a href="users.html" class="nav-active rounded-lg px-3 py-2 border border-transparent">Users</a>
-    <a href="notifications.html" class="rounded-lg px-3 py-2 border border-transparent text-gray-300 hover:bg-gray-900">Notifications</a>
-    <button id="logoutBtn" class="mt-auto rounded-lg px-3 py-2 text-left text-gray-400 hover:bg-gray-900">Logout</button>
+<body>
+<div class="aurora" aria-hidden="true"></div>
+<div class="layout">
+  <aside class="sidebar" aria-label="Admin navigation">
+    <div class="brand">GAME <b>ZONE</b></div>
+    <a href="index.html" class="navlink"><span data-icon="dashboard"></span>Dashboard</a>
+    <a href="users.html" class="navlink active"><span data-icon="users"></span>Users</a>
+    <a href="notifications.html" class="navlink"><span data-icon="bell"></span>Notifications</a>
+    <button id="logoutBtn" class="navlink" style="margin-top:auto;background:none;border:none;cursor:pointer;text-align:left;width:100%"><span data-icon="logout"></span>Logout</button>
   </aside>
-  <main class="flex-1 p-6 min-w-0">
-    <h2 class="text-2xl font-bold mb-6">Users</h2>
-    <p class="text-sm text-gray-400 mb-4">Passwords live only in Firebase Authentication (hashed by Google) and are never stored or shown here. Bans take effect on the user&apos;s next login or app start.</p>
-    <div id="errorBox" class="hidden mb-4 text-sm text-red-300 bg-red-950 border border-red-800 rounded-lg px-3 py-2"></div>
-    <div class="card rounded-2xl p-5">
-      <div class="overflow-x-auto">
-      <table class="w-full text-sm min-w-[960px]">
-        <thead class="text-gray-400">
-          <tr class="border-b border-gray-800">
-            <th>Username</th><th>First name</th><th>Last name</th><th>Mobile</th>
-            <th>Email</th><th>Wallet</th><th>Banned</th><th>Created</th><th>Actions</th>
-          </tr>
-        </thead>
-        <tbody id="userRows"><tr><td colspan="9" class="text-gray-500">Loading...</td></tr></tbody>
-      </table>
-      </div>
+  <div class="scrim" id="scrim"></div>
+  <main class="main">
+    <div class="topbar">
+      <button id="menuBtn" class="btn btn-secondary btn-sm menu-btn" aria-label="Open navigation">Menu</button>
+      <h2>Users</h2>
     </div>
-    <div class="flex items-center gap-3 mt-4 text-sm">
-      <button id="prevBtn" class="card rounded-lg px-4 py-2">Previous</button>
-      <span id="pageInfo" class="text-gray-400">Page 1</span>
-      <button id="nextBtn" class="card rounded-lg px-4 py-2">Next</button>
+    <div class="info-note">Passwords live only in Firebase Authentication (hashed by Google) and are never stored or shown here. Bans take effect on the user&apos;s next login or app start.</div>
+    <div id="errorBox" class="inline-err" style="display:none"></div>
+    <div class="glass card">
+      <div class="table-wrap">
+        <table class="data">
+          <thead><tr><th>Username</th><th>Email</th><th>Mobile</th><th>Wallet</th><th>Status</th><th>Created</th><th>Actions</th></tr></thead>
+          <tbody id="userRows"></tbody>
+        </table>
+      </div>
+      <div class="card-list" id="userCards"></div>
+      <div class="pager">
+        <button id="prevBtn" class="btn btn-secondary btn-sm">Previous</button>
+        <span id="pageInfo">Page 1</span>
+        <button id="nextBtn" class="btn btn-secondary btn-sm">Next</button>
+      </div>
     </div>
   </main>
 </div>
 <script src="api.js"></script>
+<script src="ui.js"></script>
 <script>
   Api.requireAuth();
+  UI.initDrawer();
+  document.querySelectorAll('[data-icon]').forEach((el) => { el.innerHTML = UI.icon(el.getAttribute('data-icon')); });
   document.getElementById('logoutBtn').addEventListener('click', () => Api.logout());
+  document.getElementById('menuBtn').innerHTML = UI.icon('menu');
   const errorBox = document.getElementById('errorBox');
   const userRows = document.getElementById('userRows');
+  const userCards = document.getElementById('userCards');
   const pageInfo = document.getElementById('pageInfo');
   let page = 1;
   const LIMIT = 20;
   let total = 0;
+  // Live row cache so ban/unban updates in place without a full reload.
+  let cache = [];
 
   function showError(msg) {
     errorBox.textContent = msg;
-    errorBox.classList.remove('hidden');
+    errorBox.style.display = 'block';
   }
-  function esc(s) {
-    return String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({
-      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
-    }[c]));
+  function statusChip(u) {
+    return u.isBanned ? '<span class="chip chip-red">Banned</span>' : '<span class="chip chip-green">Active</span>';
   }
-  function fmtDate(v) {
-    if (!v) return '—';
-    const d = new Date(v);
-    return isNaN(d) ? '—' : d.toLocaleString();
+  function actionBtn(u) {
+    return u.isBanned
+      ? '<button data-unban="' + UI.esc(u.id) + '" class="btn btn-primary btn-sm">Unban</button>'
+      : '<button data-ban="' + UI.esc(u.id) + '" class="btn btn-danger btn-sm">Ban</button>';
+  }
+  function paint() {
+    pageInfo.textContent = UI.pagerText(page, LIMIT, total, 'users');
+    userRows.innerHTML = cache.map((u) =>
+      '<tr><td><b>' + UI.esc(u.username) + '</b><br/><span style="color:var(--text-secondary);font-size:12px">' + UI.esc(u.firstName || '') + ' ' + UI.esc(u.lastName || '') + '</span></td>'
+      + '<td>' + UI.esc(u.email) + '</td><td>' + UI.esc(u.phone || '—') + '</td><td>' + UI.esc(u.walletBalance) + '</td>'
+      + '<td>' + statusChip(u) + '</td><td style="color:var(--text-secondary)">' + UI.esc(UI.fmtDate(u.createdAt)) + '</td>'
+      + '<td>' + actionBtn(u) + '</td></tr>').join('');
+    userCards.innerHTML = cache.map((u) =>
+      '<div class="row-card"><div class="row-title">' + UI.esc(u.username) + ' ' + statusChip(u) + '</div>'
+      + '<div class="kv"><span>Email</span><span>' + UI.esc(u.email) + '</span></div>'
+      + '<div class="kv"><span>Mobile</span><span>' + UI.esc(u.phone || '—') + '</span></div>'
+      + '<div class="kv"><span>Wallet</span><span>' + UI.esc(u.walletBalance) + '</span></div>'
+      + '<div class="kv"><span>Joined</span><span>' + UI.esc(UI.fmtDate(u.createdAt)) + '</span></div>'
+      + '<div class="row-actions">' + actionBtn(u) + '</div></div>').join('');
+    bindActions();
+  }
+  function bindActions() {
+    userRows.querySelectorAll('[data-ban]').forEach((b) => b.addEventListener('click', () => openBan(b.getAttribute('data-ban'))));
+    userRows.querySelectorAll('[data-unban]').forEach((b) => b.addEventListener('click', () => openUnban(b.getAttribute('data-unban'))));
+    userCards.querySelectorAll('[data-ban]').forEach((b) => b.addEventListener('click', () => openBan(b.getAttribute('data-ban'))));
+    userCards.querySelectorAll('[data-unban]').forEach((b) => b.addEventListener('click', () => openUnban(b.getAttribute('data-unban'))));
   }
   async function load() {
-    errorBox.classList.add('hidden');
-    userRows.innerHTML = '<tr><td colspan="9" class="text-gray-500">Loading...</td></tr>';
+    errorBox.style.display = 'none';
+    userRows.innerHTML = '<tr><td colspan="7">' + UI.skeletonRows(0, 5) + '</td></tr>';
+    userCards.innerHTML = UI.skeletonRows(0, 3);
     try {
       const data = await Api.get('/users?page=' + page + '&limit=' + LIMIT);
       total = data.total;
-      pageInfo.textContent = 'Page ' + data.page + ' of ' + Math.max(1, Math.ceil(total / LIMIT)) + ' (' + total + ' users)';
-      userRows.innerHTML = data.users.length ? data.users.map((u) =>
-        '<tr class="border-b border-gray-800">' +
-        '<td>' + esc(u.username) + '</td><td>' + esc(u.firstName) + '</td><td>' + esc(u.lastName) + '</td>' +
-        '<td>' + esc(u.phone) + '</td><td>' + esc(u.email) + '</td><td>' + esc(u.walletBalance) + '</td>' +
-        '<td>' + (u.isBanned
-          ? '<span class="text-red-400 font-bold">Banned</span>'
-          : '<span class="text-green-400">Active</span>') + '</td>' +
-        '<td class="text-gray-400">' + esc(fmtDate(u.createdAt)) + '</td>' +
-        '<td>' + (u.isBanned
-          ? '<button data-unban="' + esc(u.id) + '" class="btn-primary font-bold rounded-lg px-3 py-1 text-sm">Unban</button>'
-          : '<button data-ban="' + esc(u.id) + '" class="btn-danger font-bold rounded-lg px-3 py-1 text-sm">Ban</button>') + '</td></tr>'
-      ).join('') : '<tr><td colspan="9" class="text-gray-500">No users found.</td></tr>';
-      userRows.querySelectorAll('[data-ban]').forEach((btn) =>
-        btn.addEventListener('click', () => banUser(btn.getAttribute('data-ban'))));
-      userRows.querySelectorAll('[data-unban]').forEach((btn) =>
-        btn.addEventListener('click', () => unbanUser(btn.getAttribute('data-unban'))));
+      cache = data.users;
+      if (!cache.length) {
+        const empty = UI.emptyState('No users found.', 'New signups will appear here.');
+        userRows.innerHTML = '<tr><td colspan="7">' + empty + '</td></tr>';
+        userCards.innerHTML = empty;
+        pageInfo.textContent = UI.pagerText(page, LIMIT, total, 'users');
+        return;
+      }
+      paint();
     } catch (err) {
       showError(err.message);
+      userRows.innerHTML = '<tr><td colspan="7">' + UI.errorState(err.message) + '</td></tr>';
+      userCards.innerHTML = UI.errorState(err.message);
+      bindRetry();
     }
   }
-  async function banUser(id) {
-    const reason = window.prompt('Enter the ban reason (shown to the user):');
-    if (reason === null) return;
-    if (!reason.trim()) { showError('A ban reason is required.'); return; }
-    try {
-      await Api.post('/users/' + encodeURIComponent(id) + '/ban', { reason: reason.trim() });
-      load();
-    } catch (err) {
-      showError(err.message);
-    }
+  function bindRetry() {
+    document.querySelectorAll('[data-retry]').forEach((b) => b.addEventListener('click', load));
   }
-  async function unbanUser(id) {
-    if (!window.confirm('Unban this user?')) return;
-    try {
+  function findUser(id) {
+    return cache.find((u) => u.id === id) || { id, username: '', email: '' };
+  }
+  function openBan(id) {
+    const u = findUser(id);
+    UI.reasonModal((u.username || 'User') + ' — ' + (u.email || ''), async (reason) => {
+      await Api.post('/users/' + encodeURIComponent(id) + '/ban', { reason });
+      const row = cache.find((x) => x.id === id);
+      if (row) { row.isBanned = true; paint(); }
+      UI.toast('ok', 'User banned.');
+    });
+  }
+  function openUnban(id) {
+    const u = findUser(id);
+    UI.confirmModal('Unban this user?', (u.username || 'This user') + ' will be able to log in again.', 'Unban', false, async () => {
       await Api.post('/users/' + encodeURIComponent(id) + '/unban', {});
-      load();
-    } catch (err) {
-      showError(err.message);
-    }
+      const row = cache.find((x) => x.id === id);
+      if (row) { row.isBanned = false; paint(); }
+      UI.toast('ok', 'User unbanned.');
+    });
   }
   document.getElementById('prevBtn').addEventListener('click', () => { if (page > 1) { page -= 1; load(); } });
-  document.getElementById('nextBtn').addEventListener('click', () => {
-    if (page * LIMIT < total) { page += 1; load(); }
-  });
+  document.getElementById('nextBtn').addEventListener('click', () => { if (page * LIMIT < total) { page += 1; load(); } });
   load();
 </script>
 </body>
