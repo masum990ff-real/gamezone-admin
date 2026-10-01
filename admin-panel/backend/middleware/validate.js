@@ -37,6 +37,30 @@ const templateSchema = z.object({
   imageUrl: z.string({ error: 'Image URL is too long.' }).max(2048, { error: 'Image URL is too long.' }).optional().default(''),
 });
 
+// Public app-config settings (feature 04): links must be empty or https (empty =
+// not set); version code 0/empty = no forced update; name is display-only.
+const httpsOrEmpty = (label) => z.string({ error: label + ' is too long.' })
+  .max(2048, { error: label + ' is too long.' })
+  .optional().default('')
+  .refine((v) => !v || v.trim().startsWith('https://'),
+    { error: label + ' must start with https:// (or leave it empty).' });
+
+const settingsSchema = z.object({
+  supportLink: httpsOrEmpty('Support link'),
+  downloadLink: httpsOrEmpty('App download link'),
+  latestVersionCode: z.preprocess((v) => {
+    if (v === '' || v === null || v === undefined) return 0;
+    if (typeof v === 'string' && /^\d+$/.test(v.trim())) return Number(v.trim());
+    return v;
+  }, z.number({ error: 'Latest version code must be a whole number.' })
+    .int({ error: 'Latest version code must be a whole number.' })
+    .min(0, { error: 'Latest version code must be 0 or higher.' })
+    .max(1000000000, { error: 'Latest version code is too large.' })),
+  latestVersionName: z.string({ error: 'Latest version name is too long.' })
+    .max(32, { error: 'Latest version name must be 32 characters or fewer.' })
+    .optional().default(''),
+});
+
 function validate(schema) {
   return (req, res, next) => {
     const parsed = schema.safeParse(req.body);
@@ -49,4 +73,4 @@ function validate(schema) {
   };
 }
 
-module.exports = { validate, loginSchema, banSchema, sendSchema, templateSchema };
+module.exports = { validate, loginSchema, banSchema, sendSchema, templateSchema, settingsSchema };
