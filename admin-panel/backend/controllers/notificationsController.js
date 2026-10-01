@@ -1,3 +1,4 @@
+const crypto = require('crypto');
 const { FieldValue } = require('firebase-admin/firestore');
 const { initFirebase, formatFirestoreError } = require('../config/firebase');
 const { ok, created, fail, plain } = require('../util/respond');
@@ -18,10 +19,18 @@ async function send(req, res) {
   }
   const cleanTitle = String(title).trim();
   const cleanBody = String(body).trim();
+  if (cleanTitle.length > 200) return fail(res, 400, 'Title must be 200 characters or fewer.');
+  if (cleanBody.length > 2000) return fail(res, 400, 'Message must be 2000 characters or fewer.');
   const cleanImage = imageUrl ? String(imageUrl).trim() : '';
-  // Only a non-empty http(s) URL may enter the FCM payload — an empty or
-  // non-URL string fails FCM validation and rejects the whole send.
-  const hasImage = cleanImage.startsWith('http');
+  // FCM imageUrl must be an https URL — an empty, http-only, or non-URL
+  // string fails FCM payload validation and rejects the WHOLE send, so only
+  // a non-empty https URL may enter the payload.
+  const hasImage = cleanImage.startsWith('https://');
+  if (cleanImage && !hasImage) {
+    return fail(res, 400, 'Image URL must start with https:// (or leave it empty).');
+  }
+  // Request id: ties the Render log line to the history row and the response.
+  const sendId = crypto.randomUUID();
   try {
     const { db, messaging } = initFirebase();
     const message = {
@@ -52,6 +61,7 @@ async function send(req, res) {
       title: cleanTitle,
       body: cleanBody,
       imageUrl: cleanImage,
+      sendId,
       sentAt: FieldValue.serverTimestamp(),
       sentBy: (req.admin && req.admin.email) || 'admin',
       successCount: 1,
@@ -59,21 +69,22 @@ async function send(req, res) {
       messageId,
     };
     await db.collection('notifications_history').add(record);
-    return ok(res, { messageId, successCount: 1, failureCount: 0 }, 'Notification sent.');
+    return ok(res, { messageId, successCount: 1, failureCount: 0, sendId }, 'Notification sent.');
   } catch (err) {
     const reason = formatFirestoreError(err);
-    console.error('Broadcast send failed: ' + reason);
+    console.error('Broadcast send failed [sendId=' + sendId + ']: ' + reason);
     try {
       const { db } = initFirebase();
       await db.collection('notifications_history').add({
         title: cleanTitle,
         body: cleanBody,
         imageUrl: cleanImage,
+        sendId,
         sentAt: FieldValue.serverTimestamp(),
         sentBy: (req.admin && req.admin.email) || 'admin',
         successCount: 0,
         failureCount: 1,
-        error: String((err && err.message) || err),
+        error: String((err && err.message) || err).slice(0, 500),
       });
     } catch (ignored) {
       // History logging must never mask the original send error.
