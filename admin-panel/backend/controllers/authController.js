@@ -2,23 +2,10 @@ const bcrypt = require('bcryptjs');
 const { initFirebase, formatFirestoreError } = require('../config/firebase');
 const { signToken, ok, fail } = require('../middleware/auth');
 
-// Tiny in-code login throttle (keeps deps minimal — no extra package):
-// max 10 attempts per IP per 15 minutes, then 429.
-const attempts = new Map();
-function throttled(ip) {
-  const now = Date.now();
-  const entry = attempts.get(ip) || { count: 0, resetAt: now + 15 * 60 * 1000 };
-  if (now > entry.resetAt) {
-    entry.count = 0;
-    entry.resetAt = now + 15 * 60 * 1000;
-  }
-  entry.count += 1;
-  attempts.set(ip, entry);
-  return entry.count > 10;
-}
+// Login brute-force protection lives in middleware/rateLimit.js
+// (express-rate-limit, 10 tries/IP/15min) — applied on the route.
 
 async function login(req, res) {
-  if (throttled(req.ip)) return fail(res, 429, 'Too many login attempts. Please try again in 15 minutes.');
   const { email, password } = req.body || {};
   if (!email || !password) return fail(res, 400, 'Email and password are required.');
   let db;
