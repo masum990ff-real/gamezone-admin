@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Game Zone Admin — Settings</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Rajdhani:wght@600;700&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+<div class="aurora" aria-hidden="true"></div>
+<div class="layout">
+  <aside class="sidebar" aria-label="Admin navigation">
+    <div class="brand">GAME <b>ZONE</b></div>
+    <a href="index.html" class="navlink"><span data-icon="dashboard"></span>Dashboard</a>
+    <a href="users.html" class="navlink"><span data-icon="users"></span>Users</a>
+    <a href="notifications.html" class="navlink"><span data-icon="bell"></span>Notifications</a>
+    <a href="settings.html" class="navlink active"><span data-icon="settings"></span>Settings</a>
+    <button id="logoutBtn" class="navlink" style="margin-top:auto;background:none;border:none;cursor:pointer;text-align:left;width:100%"><span data-icon="logout"></span>Logout</button>
+  </aside>
+  <div class="scrim" id="scrim"></div>
+  <main class="main">
+    <div class="topbar">
+      <button id="menuBtn" class="btn btn-secondary btn-sm menu-btn" aria-label="Open navigation">Menu</button>
+      <h2>Settings</h2>
+    </div>
+    <p class="page-sub">Support link, download link and the latest version. The app reads these live — raising the version code forces outdated apps to update.</p>
+    <div id="errorBox" class="inline-err" style="display:none"></div>
+    <div class="glass card">
+      <div class="field-row">
+        <label class="label" for="supportLink">Customer Support Link</label>
+        <input id="supportLink" type="url" inputmode="url" class="field" placeholder="https://..." />
+        <div class="helper">One URL for the Instagram, WhatsApp and Telegram buttons in the app. Empty = not set.</div>
+      </div>
+      <div class="field-row">
+        <label class="label" for="downloadLink">App Download Link</label>
+        <input id="downloadLink" type="url" inputmode="url" class="field" placeholder="https://..." />
+        <div class="helper">Users tap “Update Now” to open this. Make sure the new APK is uploaded and this link works first.</div>
+      </div>
+      <div class="field-row">
+        <label class="label" for="versionCode">Latest Version Code</label>
+        <input id="versionCode" type="number" inputmode="numeric" min="0" step="1" class="field" placeholder="0" />
+        <div class="helper">Whole number. The app compares its own version code against this — 0 or empty means no forced update.</div>
+      </div>
+      <div class="field-row">
+        <label class="label" for="versionName">Latest Version Name</label>
+        <input id="versionName" type="text" class="field" maxlength="32" placeholder="1.2.0" />
+        <div class="char-count"><span id="nameCount">0</span>/32</div>
+        <div class="helper">Optional display text shown on the update screen.</div>
+      </div>
+      <div class="helper" id="updatedAt" style="margin-bottom:14px">Last updated: —</div>
+      <button id="saveBtn" class="btn btn-primary btn-block">Save changes</button>
+    </div>
+  </main>
+</div>
+<script src="api.js"></script>
+<script src="ui.js"></script>
+<script>
+  Api.requireAuth();
+  UI.initDrawer();
+  document.querySelectorAll('[data-icon]').forEach((el) => { el.innerHTML = UI.icon(el.getAttribute('data-icon')); });
+  document.getElementById('logoutBtn').addEventListener('click', () => Api.logout());
+  document.getElementById('menuBtn').innerHTML = UI.icon('menu');
+  const errorBox = document.getElementById('errorBox');
+  const supportEl = document.getElementById('supportLink');
+  const downloadEl = document.getElementById('downloadLink');
+  const codeEl = document.getElementById('versionCode');
+  const nameEl = document.getElementById('versionName');
+  const updatedEl = document.getElementById('updatedAt');
+  const saveBtn = document.getElementById('saveBtn');
+  let loadedCode = 0;
+
+  function showError(msg) {
+    errorBox.textContent = msg;
+    errorBox.style.display = 'block';
+  }
+  nameEl.addEventListener('input', () => { document.getElementById('nameCount').textContent = String(nameEl.value.length); });
+
+  function paint(data) {
+    supportEl.value = data.supportLink || '';
+    downloadEl.value = data.downloadLink || '';
+    codeEl.value = (data.latestVersionCode == null ? 0 : data.latestVersionCode);
+    nameEl.value = data.latestVersionName || '';
+    nameEl.dispatchEvent(new Event('input'));
+    loadedCode = Number(data.latestVersionCode) || 0;
+    updatedEl.textContent = 'Last updated: ' + (data.updatedAt ? UI.fmtDate(data.updatedAt) : 'never saved yet');
+  }
+  async function load() {
+    errorBox.style.display = 'none';
+    UI.setLoading(saveBtn, true, 'Loading...');
+    try {
+      paint(await Api.get('/settings'));
+    } catch (err) {
+      showError(err.message);
+    } finally {
+      UI.setLoading(saveBtn, false);
+    }
+  }
+  // Mirrors the backend: links must be empty or https, code a whole number >= 0, name <= 32.
+  function readForm() {
+    const support = supportEl.value.trim();
+    const download = downloadEl.value.trim();
+    const codeRaw = codeEl.value.trim();
+    const name = nameEl.value.trim();
+    if (support && !support.startsWith('https://')) return { error: 'Support link must start with https:// (or leave it empty).' };
+    if (download && !download.startsWith('https://')) return { error: 'Download link must start with https:// (or leave it empty).' };
+    if (support.length > 2048 || download.length > 2048) return { error: 'Links must be 2048 characters or fewer.' };
+    if (name.length > 32) return { error: 'Version name must be 32 characters or fewer.' };
+    const code = codeRaw === '' ? 0 : Number(codeRaw);
+    if (!Number.isInteger(code) || code < 0) return { error: 'Version code must be a whole number 0 or higher.' };
+    return { values: { supportLink: support, downloadLink: download, latestVersionCode: code, latestVersionName: name } };
+  }
+  async function persist(values) {
+    UI.setLoading(saveBtn, true, 'Saving...');
+    try {
+      const saved = await Api.put('/settings', values);
+      paint(saved);
+      UI.toast('ok', 'Settings saved.');
+    } catch (err) {
+      showError(err.message);
+      UI.toast('err', err.message);
+      throw err;
+    } finally {
+      UI.setLoading(saveBtn, false);
+    }
+  }
+  saveBtn.addEventListener('click', () => {
+    errorBox.style.display = 'none';
+    const form = readForm();
+    if (form.error) {
+      showError(form.error);
+      UI.toast('err', form.error);
+      return;
+    }
+    const next = form.values.latestVersionCode;
+    if (next !== loadedCode) {
+      const raising = next > loadedCode;
+      const body = raising
+        ? 'Every user on a version below ' + next + ' will be forced to update and cannot use the app until they do. Make sure the new APK is uploaded and the download link works first. Continue?'
+        : 'You are lowering the version code to ' + next + ' (rollback). Users on versions above this will stop being forced to update. Continue?';
+      UI.confirmModal(raising ? 'Force update for everyone below?' : 'Roll back the forced update?', body, 'Continue', raising, async () => {
+        await persist(form.values);
+      });
+      return;
+    }
+    persist(form.values).catch(() => {});
+  });
+  load();
+</script>
+</body>
+</html>
