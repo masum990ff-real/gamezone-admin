@@ -4,87 +4,103 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Game Zone Admin — Dashboard</title>
-<script src="https://cdn.tailwindcss.com"></script>
-<style>
-  body { background: #050505; }
-  .card { background: #14161B; border: 1px solid #262B33; }
-  .accent { color: #FF7A00; }
-  .nav-active { background: #1C1214; border-color: #FF7A00 !important; color: #FF7A00; }
-</style>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Rajdhani:wght@600;700&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="styles.css" />
 </head>
-<body class="min-h-screen text-gray-100">
-<div class="flex min-h-screen">
-  <aside class="w-56 shrink-0 border-r border-gray-800 p-4 flex flex-col gap-2">
-    <h1 class="text-xl font-extrabold tracking-wide px-2 mb-4">GAME <span class="accent">ZONE</span></h1>
-    <a href="index.html" class="nav-active rounded-lg px-3 py-2 border border-transparent">Dashboard</a>
-    <a href="users.html" class="rounded-lg px-3 py-2 border border-transparent text-gray-300 hover:bg-gray-900">Users</a>
-    <a href="notifications.html" class="rounded-lg px-3 py-2 border border-transparent text-gray-300 hover:bg-gray-900">Notifications</a>
-    <button id="logoutBtn" class="mt-auto rounded-lg px-3 py-2 text-left text-gray-400 hover:bg-gray-900">Logout</button>
+<body>
+<div class="aurora" aria-hidden="true"></div>
+<div class="layout">
+  <aside class="sidebar" aria-label="Admin navigation">
+    <div class="brand">GAME <b>ZONE</b></div>
+    <a href="index.html" class="navlink active"><span data-icon="dashboard"></span>Dashboard</a>
+    <a href="users.html" class="navlink"><span data-icon="users"></span>Users</a>
+    <a href="notifications.html" class="navlink"><span data-icon="bell"></span>Notifications</a>
+    <button id="logoutBtn" class="navlink" style="margin-top:auto;background:none;border:none;cursor:pointer;text-align:left;width:100%"><span data-icon="logout"></span>Logout</button>
   </aside>
-  <main class="flex-1 p-6">
-    <h2 class="text-2xl font-bold mb-6">Dashboard</h2>
-    <div id="errorBox" class="hidden mb-4 text-sm text-red-300 bg-red-950 border border-red-800 rounded-lg px-3 py-2"></div>
-    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
-      <div class="card rounded-2xl p-5">
-        <p class="text-sm text-gray-400">Total users</p>
-        <p id="statTotal" class="text-4xl font-extrabold mt-1">—</p>
-      </div>
-      <div class="card rounded-2xl p-5">
-        <p class="text-sm text-gray-400">Joined today</p>
-        <p id="statToday" class="text-4xl font-extrabold mt-1 text-green-400">—</p>
-      </div>
-      <div class="card rounded-2xl p-5">
-        <p class="text-sm text-gray-400">Joined last 7 days</p>
-        <p id="statWeek" class="text-4xl font-extrabold mt-1 accent">—</p>
-      </div>
+  <div class="scrim" id="scrim"></div>
+  <main class="main">
+    <div class="topbar">
+      <button id="menuBtn" class="btn btn-secondary btn-sm menu-btn" aria-label="Open navigation">Menu</button>
+      <h2>Dashboard</h2>
     </div>
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
-      <div class="card rounded-2xl p-5">
-        <h3 class="font-bold mb-3">Newest users</h3>
-        <div id="newestUsers" class="text-sm text-gray-300">Loading...</div>
+    <div id="errorBox" class="inline-err" style="display:none"></div>
+    <div class="stat-grid">
+      <div class="glass card"><div class="stat-label">Total users</div><div class="stat-num" id="statTotal">—</div></div>
+      <div class="glass card"><div class="stat-label">Joined today</div><div class="stat-num" id="statToday" style="color:var(--success)">—</div></div>
+      <div class="glass card"><div class="stat-label">Joined last 7 days</div><div class="stat-num" id="statWeek" style="color:var(--accent-from)">—</div></div>
+    </div>
+    <div class="cols-2">
+      <div class="glass card">
+        <h3 class="card-title">Newest users</h3>
+        <div id="newestUsers"></div>
       </div>
-      <div class="card rounded-2xl p-5">
-        <h3 class="font-bold mb-3">Recent broadcasts</h3>
-        <div id="recentNotes" class="text-sm text-gray-300">Loading...</div>
+      <div class="glass card">
+        <h3 class="card-title">Recent broadcasts</h3>
+        <div id="recentNotes"></div>
       </div>
     </div>
   </main>
 </div>
 <script src="api.js"></script>
+<script src="ui.js"></script>
 <script>
   Api.requireAuth();
+  UI.initDrawer();
+  document.querySelectorAll('[data-icon]').forEach((el) => { el.innerHTML = UI.icon(el.getAttribute('data-icon')); });
   document.getElementById('logoutBtn').addEventListener('click', () => Api.logout());
+  document.getElementById('menuBtn').innerHTML = UI.icon('menu');
   const errorBox = document.getElementById('errorBox');
+
   function showError(msg) {
     errorBox.textContent = msg;
-    errorBox.classList.remove('hidden');
+    errorBox.style.display = 'block';
   }
-  function esc(s) {
-    return String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({
-      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
-    }[c]));
+  // Gentle count-up (skipped under reduced motion).
+  function countUp(el, target) {
+    const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const n = Number(target) || 0;
+    if (reduce) { el.textContent = String(n); return; }
+    const start = performance.now();
+    const dur = 700;
+    function tick(t) {
+      const p = Math.min(1, (t - start) / dur);
+      el.textContent = String(Math.round(n * (1 - Math.pow(1 - p, 3))));
+      if (p < 1) requestAnimationFrame(tick);
+    }
+    requestAnimationFrame(tick);
   }
   async function load() {
+    errorBox.style.display = 'none';
+    document.getElementById('newestUsers').innerHTML = UI.skeletonRows(0, 4);
+    document.getElementById('recentNotes').innerHTML = UI.skeletonRows(0, 4);
     try {
       const stats = await Api.get('/dashboard/stats');
-      document.getElementById('statTotal').textContent = stats.totalUsers;
-      document.getElementById('statToday').textContent = stats.joinedToday;
-      document.getElementById('statWeek').textContent = stats.joinedWeek;
+      countUp(document.getElementById('statTotal'), stats.totalUsers);
+      countUp(document.getElementById('statToday'), stats.joinedToday);
+      countUp(document.getElementById('statWeek'), stats.joinedWeek);
       const users = await Api.get('/users?page=1&limit=5');
       document.getElementById('newestUsers').innerHTML = users.users.length
-        ? '<ul class="space-y-2">' + users.users.map((u) =>
-            '<li class="flex justify-between border-b border-gray-800 pb-2"><span>' +
-            esc(u.username || u.email) + '</span><span class="text-gray-500">' + esc(u.email || '') + '</span></li>').join('') + '</ul>'
-        : 'No users yet.';
+        ? users.users.map((u) =>
+            '<div class="tpl-item"><span><b>' + UI.esc(u.username || u.email) + '</b><br/><span style="color:var(--text-secondary)">' + UI.esc(u.email || '') + '</span></span></div>').join('')
+        : UI.emptyState('No users yet.', 'New signups will appear here.');
       const notes = await Api.get('/notifications/history?page=1&limit=5');
       document.getElementById('recentNotes').innerHTML = notes.notifications.length
-        ? '<ul class="space-y-2">' + notes.notifications.map((n) =>
-            '<li class="flex justify-between border-b border-gray-800 pb-2"><span>' +
-            esc(n.title) + '</span><span class="text-gray-500">sent ' + n.successCount + ' / failed ' + n.failureCount + '</span></li>').join('') + '</ul>'
-        : 'No broadcasts yet.';
+        ? notes.notifications.map((n) =>
+            '<div class="tpl-item"><span><b>' + UI.esc(n.title) + '</b></span>'
+            + '<span><span class="chip chip-green">' + n.successCount + ' sent</span> '
+            + '<span class="chip ' + (n.failureCount ? 'chip-red' : 'chip-grey') + '">' + n.failureCount + ' failed</span></span></div>').join('')
+        : UI.emptyState('No broadcasts yet.', 'Send one from Notifications.');
     } catch (err) {
       showError(err.message);
+      document.getElementById('newestUsers').innerHTML = UI.errorState(err.message);
+      document.getElementById('recentNotes').innerHTML = UI.errorState(err.message);
+      bindRetry();
     }
+  }
+  function bindRetry() {
+    document.querySelectorAll('[data-retry]').forEach((b) => b.addEventListener('click', load));
   }
   load();
 </script>
