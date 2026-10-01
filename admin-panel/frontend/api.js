@@ -53,6 +53,9 @@ const Api = (() => {
   function post(path, body) {
     return request(path, { method: 'POST', body: body || {} });
   }
+  function put(path, body) {
+    return request(path, { method: 'PUT', body: body || {} });
+  }
   function del(path) {
     return request(path, { method: 'DELETE' });
   }
@@ -63,5 +66,5 @@ const Api = (() => {
     return data;
   }
 
-  return { token, isLoggedIn, logout, requireAuth, get, post, del, login };
+  return { token, isLoggedIn, logout, requireAuth, get, post, put, del, login };
 })();
