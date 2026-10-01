@@ -1,9 +1,14 @@
 require('dotenv').config();
+const crypto = require('crypto');
 const express = require('express');
 const path = require('path');
 const cors = require('cors');
+const helmet = require('helmet');
+const compression = require('compression');
 const bcrypt = require('bcryptjs');
 const { fail } = require('./util/respond');
+const logger = require('./util/logger');
+const { apiLimiter } = require('./middleware/rateLimit');
 const { initFirebase, firebaseStatus, formatFirestoreError } = require('./config/firebase');
 
 const authRoutes = require('./routes/auth');
@@ -12,7 +17,33 @@ const dashboardRoutes = require('./routes/dashboard');
 const notificationRoutes = require('./routes/notifications');
 
 const app = express();
-app.set('trust proxy', 1); // correct req.ip behind Render's proxy (login throttle)
+app.set('trust proxy', 1); // correct req.ip behind Render's proxy (rate limiters)
+// Request id on every request (Render logs + X-Request-Id header).
+app.use((req, res, next) => {
+  req.id = crypto.randomUUID();
+  res.setHeader('X-Request-Id', req.id);
+  next();
+});
+// Security headers. CSP allows our own inline scripts/styles, Google Fonts,
+// and https: images (notification thumbnail previews); COEP stays off so
+// cross-origin previews still render.
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'", "'unsafe-inline'"],
+      styleSrc: ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
+      fontSrc: ["'self'", 'https://fonts.gstatic.com'],
+      imgSrc: ["'self'", 'data:', 'https:'],
+      connectSrc: ["'self'"],
+      objectSrc: ["'none'"],
+      baseUri: ["'self'"],
+      frameAncestors: ["'none'"],
+    },
+  },
+  crossOriginEmbedderPolicy: false,
+}));
+app.use(compression());
 const corsOrigin = (process.env.CORS_ORIGIN || '*').trim();
 app.use(cors({ origin: corsOrigin === '*' ? '*' : corsOrigin.split(',').map((s) => s.trim()).filter(Boolean) }));
 app.use(express.json({ limit: '256kb' }));
@@ -21,6 +52,9 @@ const frontendDir = path.join(__dirname, '..', 'frontend');
 // Static files only from frontend/ (index:false keeps / mapped to login.html below).
 app.use(express.static(frontendDir, { index: false }));
 app.get('/', (req, res) => res.sendFile(path.join(frontendDir, 'login.html')));
+
+// Lightweight liveness probe (no Firebase touch) for uptime monitors.
+app.get('/healthz', (req, res) => res.json({ success: true, data: { ok: true }, message: '' }));
 
 app.get('/health', async (req, res) => {
   let firebase = false;
@@ -55,6 +89,7 @@ app.get('/health', async (req, res) => {
   });
 });
 
+app.use('/api/v1', apiLimiter);
 app.use('/api/v1/auth', authRoutes);
 app.use('/api/v1/users', userRoutes);
 app.use('/api/v1/dashboard', dashboardRoutes);
@@ -62,7 +97,12 @@ app.use('/api/v1/notifications', notificationRoutes);
 
 app.use('/api', (req, res) => fail(res, 404, 'Route not found.'));
 app.get(/.*/, (req, res) => res.sendFile(path.join(frontendDir, 'login.html')));
-app.use((err, req, res, next) => fail(res, 500, 'Something went wrong.'));
+// Central error handler (Express 5 also forwards async rejections here):
+// consistent JSON, never a stack trace to the client.
+app.use((err, req, res, next) => {
+  logger.error('Unhandled error', { reqId: req && req.id, route: req && req.path });
+  return fail(res, 500, 'Something went wrong.');
+});
 
 const PORT = parseInt(process.env.PORT, 10) || 3000;
 checkEnv();
@@ -76,9 +116,16 @@ async function start() {
   } catch (err) {
     console.error('Auto-seed check failed.');
   }
-  app.listen(PORT, () => {
+  const server = app.listen(PORT, () => {
     console.log('GameZone admin backend listening on port ' + PORT);
   });
+  // Graceful shutdown: stop taking traffic, then exit.
+  for (const sig of ['SIGTERM', 'SIGINT']) {
+    process.on(sig, () => {
+      server.close(() => process.exit(0));
+      setTimeout(() => process.exit(0), 5000).unref();
+    });
+  }
 }
 
 // Boot-time config check: one clear single-line error per missing/invalid env.
