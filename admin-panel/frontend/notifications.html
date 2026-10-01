@@ -4,87 +4,101 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Game Zone Admin — Notifications</title>
-<script src="https://cdn.tailwindcss.com"></script>
-<style>
-  body { background: #050505; }
-  .card { background: #14161B; border: 1px solid #262B33; }
-  .accent { color: #FF7A00; }
-  .nav-active { background: #1C1214; border-color: #FF7A00 !important; color: #FF7A00; }
-  .btn-primary { background: #00E676; color: #06110B; }
-  .btn-primary:disabled { opacity: .5; }
-  .field { background: #0B0D10; border: 1px solid #2A2E35; color: #F2F4F7; }
-  table th, table td { padding: 10px 12px; text-align: left; }
-</style>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Rajdhani:wght@600;700&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="styles.css" />
 </head>
-<body class="min-h-screen text-gray-100">
-<div class="flex min-h-screen">
-  <aside class="w-56 shrink-0 border-r border-gray-800 p-4 flex flex-col gap-2">
-    <h1 class="text-xl font-extrabold tracking-wide px-2 mb-4">GAME <span class="accent">ZONE</span></h1>
-    <a href="index.html" class="rounded-lg px-3 py-2 border border-transparent text-gray-300 hover:bg-gray-900">Dashboard</a>
-    <a href="users.html" class="rounded-lg px-3 py-2 border border-transparent text-gray-300 hover:bg-gray-900">Users</a>
-    <a href="notifications.html" class="nav-active rounded-lg px-3 py-2 border border-transparent">Notifications</a>
-    <button id="logoutBtn" class="mt-auto rounded-lg px-3 py-2 text-left text-gray-400 hover:bg-gray-900">Logout</button>
+<body>
+<div class="aurora" aria-hidden="true"></div>
+<div class="layout">
+  <aside class="sidebar" aria-label="Admin navigation">
+    <div class="brand">GAME <b>ZONE</b></div>
+    <a href="index.html" class="navlink"><span data-icon="dashboard"></span>Dashboard</a>
+    <a href="users.html" class="navlink"><span data-icon="users"></span>Users</a>
+    <a href="notifications.html" class="navlink active"><span data-icon="bell"></span>Notifications</a>
+    <button id="logoutBtn" class="navlink" style="margin-top:auto;background:none;border:none;cursor:pointer;text-align:left;width:100%"><span data-icon="logout"></span>Logout</button>
   </aside>
-  <main class="flex-1 p-6">
-    <h2 class="text-2xl font-bold mb-6">Notifications</h2>
-    <div id="errorBox" class="hidden mb-4 text-sm text-red-300 bg-red-950 border border-red-800 rounded-lg px-3 py-2"></div>
-    <div id="okBox" class="hidden mb-4 text-sm text-green-300 bg-green-950 border border-green-800 rounded-lg px-3 py-2"></div>
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-8">
-      <div class="card rounded-2xl p-5">
-        <h3 class="font-bold mb-3">Send broadcast to all users</h3>
-        <label class="block text-sm text-gray-400 mb-1" for="tplPicker">Template (fills the form)</label>
-        <select id="tplPicker" class="field rounded-lg w-full px-3 py-2 mb-4 text-sm">
-          <option value="">— No template —</option>
-        </select>
-        <label class="block text-sm text-gray-400 mb-1" for="title">Title</label>
-        <input id="title" type="text" class="field rounded-lg w-full px-3 py-2 mb-4 text-sm" placeholder="Tournament starting soon" />
-        <label class="block text-sm text-gray-400 mb-1" for="body">Message</label>
-        <textarea id="body" rows="3" class="field rounded-lg w-full px-3 py-2 mb-4 text-sm" placeholder="Room opens in 10 minutes..."></textarea>
-        <label class="block text-sm text-gray-400 mb-1" for="imageUrl">Image URL (optional)</label>
-        <input id="imageUrl" type="text" class="field rounded-lg w-full px-3 py-2 mb-4 text-sm" placeholder="https://..." />
-        <label class="flex items-center gap-2 text-sm text-gray-300 mb-4">
-          <input id="saveTpl" type="checkbox" class="w-4 h-4" /> Save as template after sending
-        </label>
-        <button id="sendBtn" class="btn-primary font-bold rounded-xl w-full py-3">Send to all users</button>
+  <div class="scrim" id="scrim"></div>
+  <main class="main">
+    <div class="topbar">
+      <button id="menuBtn" class="btn btn-secondary btn-sm menu-btn" aria-label="Open navigation">Menu</button>
+      <h2>Notifications</h2>
+    </div>
+    <p class="page-sub">Broadcasts go to every installed device via the all_users topic.</p>
+    <div id="errorBox" class="inline-err" style="display:none"></div>
+    <div class="cols-2" style="margin-bottom:18px">
+      <div class="glass card" style="margin-bottom:0">
+        <h3 class="card-title">Send broadcast to all users</h3>
+        <div class="field-row">
+          <label class="label" for="tplPicker">Template (fills the form)</label>
+          <div class="select-wrap"><select id="tplPicker" class="field"><option value="">— No template —</option></select></div>
+        </div>
+        <div class="field-row">
+          <label class="label" for="title">Title</label>
+          <input id="title" type="text" class="field" maxlength="200" placeholder="Tournament starting soon" />
+          <div class="char-count"><span id="titleCount">0</span>/200</div>
+        </div>
+        <div class="field-row">
+          <label class="label" for="body">Message</label>
+          <textarea id="body" rows="3" class="field" maxlength="2000" placeholder="Room opens in 10 minutes..."></textarea>
+          <div class="char-count"><span id="bodyCount">0</span>/2000</div>
+        </div>
+        <div class="field-row">
+          <label class="label" for="imageUrl">Image URL (optional, https only)</label>
+          <input id="imageUrl" type="url" inputmode="url" class="field" placeholder="https://..." />
+          <img id="imgPreview" class="thumb" alt="Image preview" />
+          <div class="helper" id="imgHint">A small preview appears when the URL loads.</div>
+        </div>
+        <label class="toggle"><input id="saveTpl" type="checkbox" /><span class="track" aria-hidden="true"></span>Save as template after sending</label>
+        <div style="height:14px"></div>
+        <button id="sendBtn" class="btn btn-primary btn-block">Send to all users</button>
+        <div id="resultBox" style="margin-top:14px"></div>
       </div>
-      <div class="card rounded-2xl p-5">
-        <h3 class="font-bold mb-3">Saved templates</h3>
-        <div id="tplList" class="text-sm text-gray-300">Loading...</div>
+      <div class="glass card" style="margin-bottom:0">
+        <h3 class="card-title">Saved templates</h3>
+        <div id="tplList">Loading...</div>
       </div>
     </div>
-    <div class="card rounded-2xl p-5">
-      <h3 class="font-bold mb-3">History</h3>
-      <div class="overflow-x-auto">
-        <table class="w-full text-sm">
-          <thead class="text-gray-400">
-            <tr class="border-b border-gray-800"><th>Title</th><th>Message</th><th>Sent at</th><th>Sent by</th><th>Sent</th><th>Failed</th></tr>
-          </thead>
-          <tbody id="histRows"><tr><td colspan="6" class="text-gray-500">Loading...</td></tr></tbody>
+    <div class="glass card">
+      <h3 class="card-title">History</h3>
+      <div class="table-wrap">
+        <table class="data">
+          <thead><tr><th>Title</th><th>Message</th><th>Sent at</th><th>Sent by</th><th>Result</th></tr></thead>
+          <tbody id="histRows"></tbody>
         </table>
       </div>
-      <div class="flex items-center gap-3 mt-4 text-sm">
-        <button id="prevBtn" class="card rounded-lg px-4 py-2">Previous</button>
-        <span id="pageInfo" class="text-gray-400">Page 1</span>
-        <button id="nextBtn" class="card rounded-lg px-4 py-2">Next</button>
+      <div class="card-list" id="histCards"></div>
+      <div class="pager">
+        <button id="prevBtn" class="btn btn-secondary btn-sm">Previous</button>
+        <span id="pageInfo">Page 1</span>
+        <button id="nextBtn" class="btn btn-secondary btn-sm">Next</button>
       </div>
     </div>
   </main>
 </div>
 <script src="api.js"></script>
+<script src="ui.js"></script>
 <script>
   Api.requireAuth();
+  UI.initDrawer();
+  document.querySelectorAll('[data-icon]').forEach((el) => { el.innerHTML = UI.icon(el.getAttribute('data-icon')); });
   document.getElementById('logoutBtn').addEventListener('click', () => Api.logout());
+  document.getElementById('menuBtn').innerHTML = UI.icon('menu');
   const errorBox = document.getElementById('errorBox');
-  const okBox = document.getElementById('okBox');
   const titleEl = document.getElementById('title');
   const bodyEl = document.getElementById('body');
   const imageEl = document.getElementById('imageUrl');
   const saveTplEl = document.getElementById('saveTpl');
   const sendBtn = document.getElementById('sendBtn');
+  const resultBox = document.getElementById('resultBox');
   const tplPicker = document.getElementById('tplPicker');
   const tplList = document.getElementById('tplList');
   const histRows = document.getElementById('histRows');
+  const histCards = document.getElementById('histCards');
   const pageInfo = document.getElementById('pageInfo');
+  const imgPreview = document.getElementById('imgPreview');
+  const imgHint = document.getElementById('imgHint');
   let templates = [];
   let page = 1;
   const LIMIT = 20;
@@ -92,43 +106,61 @@
 
   function showError(msg) {
     errorBox.textContent = msg;
-    errorBox.classList.remove('hidden');
+    errorBox.style.display = 'block';
   }
-  function showOk(msg) {
-    okBox.textContent = msg;
-    okBox.classList.remove('hidden');
+  titleEl.addEventListener('input', () => { document.getElementById('titleCount').textContent = String(titleEl.value.length); });
+  bodyEl.addEventListener('input', () => { document.getElementById('bodyCount').textContent = String(bodyEl.value.length); });
+  imageEl.addEventListener('input', () => {
+    const v = imageEl.value.trim();
+    if (v.startsWith('https://')) {
+      imgPreview.src = v;
+      imgPreview.style.display = 'block';
+      imgHint.textContent = 'Preview loading...';
+    } else {
+      imgPreview.style.display = 'none';
+      imgPreview.removeAttribute('src');
+      imgHint.textContent = v ? 'Only https:// URLs are accepted.' : 'A small preview appears when the URL loads.';
+    }
+  });
+  imgPreview.addEventListener('load', () => { imgHint.textContent = 'Preview loaded.'; });
+  imgPreview.addEventListener('error', () => { imgHint.textContent = 'That URL did not load as an image.'; });
+
+  function paintResult(r) {
+    resultBox.innerHTML = '<div class="inline-ok">Broadcast finished.</div>'
+      + '<div class="result-card"><div class="result-cell"><b style="color:var(--success)">' + r.successCount + '</b>Sent</div>'
+      + '<div class="result-cell"><b style="color:' + (r.failureCount ? 'var(--danger)' : 'var(--text-secondary)') + '">' + r.failureCount + '</b>Failed</div></div>'
+      + (r.failureReason ? '<details class="fail-detail"><summary>Failure details</summary><div>' + UI.esc(r.failureReason) + '</div></details>' : '');
   }
-  function esc(s) {
-    return String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({
-      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
-    }[c]));
-  }
-  function fmtDate(v) {
-    if (!v) return '—';
-    const d = new Date(v);
-    return isNaN(d) ? '—' : d.toLocaleString();
-  }
+
   async function loadTemplates() {
     try {
       templates = await Api.get('/notifications/templates');
       tplPicker.innerHTML = '<option value="">— No template —</option>' + templates.map((t) =>
-        '<option value="' + esc(t.id) + '">' + esc(t.title) + '</option>').join('');
-      tplList.innerHTML = templates.length ? '<ul class="space-y-2">' + templates.map((t) =>
-        '<li class="flex justify-between items-start border-b border-gray-800 pb-2"><span><b>' +
-        esc(t.title) + '</b><br/><span class="text-gray-400">' + esc(t.body) + '</span></span>' +
-        '<button data-deltpl="' + esc(t.id) + '" class="text-red-400 underline ml-3">Delete</button></li>').join('') + '</ul>'
-        : 'No templates yet. Tick "Save as template" when sending to reuse a message.';
-      tplList.querySelectorAll('[data-deltpl]').forEach((btn) =>
-        btn.addEventListener('click', () => deleteTemplate(btn.getAttribute('data-deltpl'))));
-    } catch (err) {
-      showError(err.message);
-    }
-  }
-  async function deleteTemplate(id) {
-    if (!window.confirm('Delete this template?')) return;
-    try {
-      await Api.del('/notifications/templates/' + encodeURIComponent(id));
-      loadTemplates();
+        '<option value="' + UI.esc(t.id) + '">' + UI.esc(t.title) + '</option>').join('');
+      tplList.innerHTML = templates.length ? templates.map((t) =>
+        '<div class="tpl-item"><span><b>' + UI.esc(t.title) + '</b><br/><span style="color:var(--text-secondary)">' + UI.esc(t.body) + '</span></span>'
+        + '<span style="display:flex;gap:6px;flex-shrink:0"><button data-use="' + UI.esc(t.id) + '" class="btn btn-secondary btn-sm">Use</button>'
+        + '<button data-deltpl="' + UI.esc(t.id) + '" class="btn btn-danger btn-sm">Delete</button></span></div>').join('')
+        : UI.emptyState('No templates yet.', 'Tick "Save as template" when sending to reuse a message.');
+      tplList.querySelectorAll('[data-use]').forEach((b) => b.addEventListener('click', () => {
+        const t = templates.find((x) => x.id === b.getAttribute('data-use'));
+        if (t) {
+          titleEl.value = t.title || '';
+          bodyEl.value = t.body || '';
+          imageEl.value = t.imageUrl || '';
+          titleEl.dispatchEvent(new Event('input'));
+          bodyEl.dispatchEvent(new Event('input'));
+          imageEl.dispatchEvent(new Event('input'));
+        }
+      }));
+      tplList.querySelectorAll('[data-deltpl]').forEach((b) => b.addEventListener('click', () => {
+        const t = templates.find((x) => x.id === b.getAttribute('data-deltpl'));
+        UI.confirmModal('Delete this template?', '"' + ((t && t.title) || '') + '" will be removed permanently.', 'Delete', true, async () => {
+          await Api.del('/notifications/templates/' + encodeURIComponent(b.getAttribute('data-deltpl')));
+          UI.toast('ok', 'Template deleted.');
+          loadTemplates();
+        });
+      }));
     } catch (err) {
       showError(err.message);
     }
@@ -139,52 +171,92 @@
       titleEl.value = t.title || '';
       bodyEl.value = t.body || '';
       imageEl.value = t.imageUrl || '';
+      titleEl.dispatchEvent(new Event('input'));
+      bodyEl.dispatchEvent(new Event('input'));
+      imageEl.dispatchEvent(new Event('input'));
     }
   });
-  sendBtn.addEventListener('click', async () => {
-    errorBox.classList.add('hidden');
-    okBox.classList.add('hidden');
-    sendBtn.disabled = true;
-    sendBtn.textContent = 'Sending...';
-    try {
-      const payload = { title: titleEl.value.trim(), body: bodyEl.value.trim() };
-      if (imageEl.value.trim()) payload.imageUrl = imageEl.value.trim();
-      const result = await Api.post('/notifications/send', payload);
-      if (saveTplEl.checked) {
-        await Api.post('/notifications/templates', payload);
-        loadTemplates();
+
+  sendBtn.addEventListener('click', () => {
+    errorBox.style.display = 'none';
+    const title = titleEl.value.trim();
+    const body = bodyEl.value.trim();
+    const image = imageEl.value.trim();
+    if (!title || !body) {
+      showError('Title and message are both required.');
+      return;
+    }
+    if (image && !image.startsWith('https://')) {
+      showError('Image URL must start with https:// (or leave it empty).');
+      return;
+    }
+    UI.confirmModal('Send to all users?', 'This notifies every installed device.', 'Send now', false, async () => {
+      UI.setLoading(sendBtn, true, 'Sending...');
+      resultBox.innerHTML = '';
+      try {
+        const payload = { title, body };
+        if (image) payload.imageUrl = image;
+        const result = await Api.post('/notifications/send', payload);
+        if (saveTplEl.checked) {
+          await Api.post('/notifications/templates', payload);
+          loadTemplates();
+        }
+        paintResult({ successCount: result.successCount, failureCount: result.failureCount });
+        UI.toast(result.failureCount ? 'info' : 'ok', 'Broadcast sent. ' + result.successCount + ' sent, ' + result.failureCount + ' failed.');
+        titleEl.value = '';
+        bodyEl.value = '';
+        titleEl.dispatchEvent(new Event('input'));
+        bodyEl.dispatchEvent(new Event('input'));
+        loadHistory();
+      } catch (err) {
+        // The backend message already carries the REAL FCM reason.
+        const m = err.message || 'Notification could not be sent.';
+        paintResult({ successCount: 0, failureCount: 1, failureReason: m.replace(/^Notification could not be sent:\s*/, '') });
+        UI.toast('err', m);
+      } finally {
+        UI.setLoading(sendBtn, false);
       }
-      showOk('Broadcast sent. Accepted: ' + result.successCount + ', failed: ' + result.failureCount + '.');
-      titleEl.value = '';
-      bodyEl.value = '';
-      loadHistory();
-    } catch (err) {
-      showError(err.message);
-    } finally {
-      sendBtn.disabled = false;
-      sendBtn.textContent = 'Send to all users';
-    }
+    });
   });
+
+  function histChips(n) {
+    return '<span class="chip chip-green">' + n.successCount + ' sent</span> '
+      + '<span class="chip ' + (n.failureCount ? 'chip-red' : 'chip-grey') + '">' + n.failureCount + ' failed</span>';
+  }
   async function loadHistory() {
-    histRows.innerHTML = '<tr><td colspan="6" class="text-gray-500">Loading...</td></tr>';
+    histRows.innerHTML = '<tr><td colspan="5">' + UI.skeletonRows(0, 5) + '</td></tr>';
+    histCards.innerHTML = UI.skeletonRows(0, 3);
     try {
       const data = await Api.get('/notifications/history?page=' + page + '&limit=' + LIMIT);
       total = data.total;
-      pageInfo.textContent = 'Page ' + data.page + ' of ' + Math.max(1, Math.ceil(total / LIMIT)) + ' (' + total + ')';
-      histRows.innerHTML = data.notifications.length ? data.notifications.map((n) =>
-        '<tr class="border-b border-gray-800"><td>' + esc(n.title) + '</td><td class="text-gray-400">' +
-        esc(n.body) + '</td><td class="text-gray-400">' + esc(fmtDate(n.sentAt)) + '</td><td>' +
-        esc(n.sentBy) + '</td><td class="text-green-400">' + n.successCount + '</td><td class="text-red-400">' +
-        n.failureCount + '</td></tr>').join('')
-        : '<tr><td colspan="6" class="text-gray-500">No broadcasts yet.</td></tr>';
+      pageInfo.textContent = UI.pagerText(page, LIMIT, total, 'broadcasts');
+      if (!data.notifications.length) {
+        const empty = UI.emptyState('No broadcasts yet.', 'Your sent broadcasts will appear here.');
+        histRows.innerHTML = '<tr><td colspan="5">' + empty + '</td></tr>';
+        histCards.innerHTML = empty;
+        return;
+      }
+      histRows.innerHTML = data.notifications.map((n) =>
+        '<tr><td><b>' + UI.esc(n.title) + '</b>' + (n.error ? '<br/><span style="color:var(--danger);font-size:12px">' + UI.esc(String(n.error).slice(0, 140)) + '</span>' : '')
+        + '</td><td style="color:var(--text-secondary)">' + UI.esc(n.body) + '</td>'
+        + '<td style="color:var(--text-secondary)">' + UI.esc(UI.fmtDate(n.sentAt)) + '</td>'
+        + '<td>' + UI.esc(n.sentBy) + '</td><td>' + histChips(n) + '</td></tr>').join('');
+      histCards.innerHTML = data.notifications.map((n) =>
+        '<div class="row-card"><div class="row-title">' + UI.esc(n.title) + '</div>'
+        + '<div style="color:var(--text-secondary);font-size:13px;margin-bottom:6px">' + UI.esc(n.body) + '</div>'
+        + '<div class="kv"><span>Sent at</span><span>' + UI.esc(UI.fmtDate(n.sentAt)) + '</span></div>'
+        + '<div class="kv"><span>By</span><span>' + UI.esc(n.sentBy) + '</span></div>'
+        + (n.error ? '<div class="kv"><span>Error</span><span style="color:var(--danger)">' + UI.esc(String(n.error).slice(0, 140)) + '</span></div>' : '')
+        + '<div style="margin-top:8px">' + histChips(n) + '</div></div>').join('');
     } catch (err) {
       showError(err.message);
+      histRows.innerHTML = '<tr><td colspan="5">' + UI.errorState(err.message) + '</td></tr>';
+      histCards.innerHTML = UI.errorState(err.message);
+      document.querySelectorAll('[data-retry]').forEach((b) => b.addEventListener('click', loadHistory));
     }
   }
   document.getElementById('prevBtn').addEventListener('click', () => { if (page > 1) { page -= 1; loadHistory(); } });
-  document.getElementById('nextBtn').addEventListener('click', () => {
-    if (page * LIMIT < total) { page += 1; loadHistory(); }
-  });
+  document.getElementById('nextBtn').addEventListener('click', () => { if (page * LIMIT < total) { page += 1; loadHistory(); } });
   loadTemplates();
   loadHistory();
 </script>
