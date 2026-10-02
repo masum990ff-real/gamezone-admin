@@ -2,6 +2,7 @@ const crypto = require('crypto');
 const { FieldValue } = require('firebase-admin/firestore');
 const { initFirebase, formatFirestoreError } = require('../config/firebase');
 const { ok, created, fail, plain } = require('../util/respond');
+const { isValidDocId } = require('../util/ids');
 
 function pageParams(req) {
   const page = Math.max(1, parseInt(req.query.page, 10) || 1);
@@ -22,6 +23,7 @@ async function send(req, res) {
   if (cleanTitle.length > 200) return fail(res, 400, 'Title must be 200 characters or fewer.');
   if (cleanBody.length > 2000) return fail(res, 400, 'Message must be 2000 characters or fewer.');
   const cleanImage = imageUrl ? String(imageUrl).trim() : '';
+  if (cleanImage.length > 2048) return fail(res, 400, 'Image URL is too long.');
   // FCM imageUrl must be an https URL — an empty, http-only, or non-URL
   // string fails FCM payload validation and rejects the WHOLE send, so only
   // a non-empty https URL may enter the payload.
@@ -122,6 +124,9 @@ async function createTemplate(req, res) {
   if (!title || !String(title).trim() || !body || !String(body).trim()) {
     return fail(res, 400, 'Title and body are required.');
   }
+  if (String(title).trim().length > 200) return fail(res, 400, 'Title must be 200 characters or fewer.');
+  if (String(body).trim().length > 2000) return fail(res, 400, 'Message must be 2000 characters or fewer.');
+  if (imageUrl && String(imageUrl).trim().length > 2048) return fail(res, 400, 'Image URL is too long.');
   try {
     const { db } = initFirebase();
     const ref = await db.collection('notification_templates').add({
@@ -138,6 +143,7 @@ async function createTemplate(req, res) {
 }
 
 async function deleteTemplate(req, res) {
+  if (!isValidDocId(req.params.id)) return fail(res, 404, 'Template not found.');
   try {
     const { db } = initFirebase();
     const ref = db.collection('notification_templates').doc(req.params.id);
