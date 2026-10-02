@@ -47,6 +47,9 @@ async function update(req, res) {
   if (!Number.isInteger(code) || code < 0) {
     return fail(res, 400, 'Latest version code must be a whole number 0 or higher.');
   }
+  if (code > 1000000000) {
+    return fail(res, 400, 'Latest version code is too large.');
+  }
   const name = latestVersionName == null ? '' : String(latestVersionName);
   if (name.length > 32) return fail(res, 400, 'Latest version name must be 32 characters or fewer.');
   try {
