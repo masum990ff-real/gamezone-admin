@@ -1,6 +1,7 @@
 const { FieldValue } = require('firebase-admin/firestore');
 const { initFirebase } = require('../config/firebase');
 const { ok, fail, plain } = require('../util/respond');
+const { isValidDocId } = require('../util/ids');
 
 function pageParams(req) {
   const page = Math.max(1, parseInt(req.query.page, 10) || 1);
@@ -24,6 +25,7 @@ async function list(req, res) {
 }
 
 async function detail(req, res) {
+  if (!isValidDocId(req.params.id)) return fail(res, 404, 'User not found.');
   try {
     const { db } = initFirebase();
     const doc = await db.collection('users').doc(req.params.id).get();
@@ -37,6 +39,8 @@ async function detail(req, res) {
 async function ban(req, res) {
   const reason = String((req.body || {}).reason || '').trim();
   if (!reason) return fail(res, 400, 'A ban reason is required.');
+  if (reason.length > 200) return fail(res, 400, 'Ban reason must be 200 characters or fewer.');
+  if (!isValidDocId(req.params.id)) return fail(res, 404, 'User not found.');
   try {
     const { db, auth } = initFirebase();
     const ref = db.collection('users').doc(req.params.id);
@@ -59,6 +63,7 @@ async function ban(req, res) {
 }
 
 async function unban(req, res) {
+  if (!isValidDocId(req.params.id)) return fail(res, 404, 'User not found.');
   try {
     const { db } = initFirebase();
     const ref = db.collection('users').doc(req.params.id);
