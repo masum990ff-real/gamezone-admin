@@ -34,7 +34,11 @@ const templateSchema = z.object({
   body: z.string({ error: 'Title and body are required.' }).trim()
     .min(1, { error: 'Title and body are required.' })
     .max(2000, { error: 'Message must be 2000 characters or fewer.' }),
-  imageUrl: z.string({ error: 'Image URL is too long.' }).max(2048, { error: 'Image URL is too long.' }).optional().default(''),
+  // Same https-or-empty rule as send: an http template image would fail the
+  // WHOLE broadcast at send time, so reject it at save time instead.
+  imageUrl: z.string({ error: 'Image URL is too long.' }).max(2048, { error: 'Image URL is too long.' }).optional().default('')
+    .refine((v) => !v || !v.trim() || v.trim().startsWith('https://'),
+      { error: 'Image URL must start with https:// (or leave it empty).' }),
 });
 
 // Public app-config settings (feature 04): links must be empty or https (empty =
