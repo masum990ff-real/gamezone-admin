@@ -127,6 +127,10 @@ async function createTemplate(req, res) {
   if (String(title).trim().length > 200) return fail(res, 400, 'Title must be 200 characters or fewer.');
   if (String(body).trim().length > 2000) return fail(res, 400, 'Message must be 2000 characters or fewer.');
   if (imageUrl && String(imageUrl).trim().length > 2048) return fail(res, 400, 'Image URL is too long.');
+  // Defense in depth behind validate.js: same https-or-empty rule as send().
+  if (imageUrl && String(imageUrl).trim() && !String(imageUrl).trim().startsWith('https://')) {
+    return fail(res, 400, 'Image URL must start with https:// (or leave it empty).');
+  }
   try {
     const { db } = initFirebase();
     const ref = await db.collection('notification_templates').add({
