@@ -91,6 +91,17 @@ app.get('/health', async (req, res) => {
 });
 
 app.use('/api/v1', apiLimiter);
+// EXTENSION POINTS (future tournament/wallet endpoints slot in here):
+// - Add routes/<name>.js + controllers/<name>Controller.js, then mount as
+//   app.use('/api/v1/<kebab-name>', <name>Routes) on these same lines.
+// - Keep the contract: {success,data,message} via util/respond + kebab-case
+//   paths; add one Zod schema per write endpoint in middleware/validate.js.
+// - List endpoints MUST take page/limit and use cursor pagination
+//   (orderBy + startAfter + limit), never offset over large collections.
+// - Multi-field filter/sort queries need Firestore COMPOSITE INDEXES deployed
+//   in the console first (e.g. tournaments by status+startTime, wallet ledger
+//   by uid+createdAt) — single-field orderBy/where needs no composite index.
+// - Batch related reads (whereIn / Promise.all), never N+1 per-item gets.
 app.use('/api/v1/auth', authRoutes);
 app.use('/api/v1/users', userRoutes);
 app.use('/api/v1/dashboard', dashboardRoutes);
@@ -102,6 +113,12 @@ app.get(/.*/, (req, res) => res.sendFile(path.join(frontendDir, 'login.html')));
 // Central error handler (Express 5 also forwards async rejections here):
 // consistent JSON, never a stack trace to the client.
 app.use((err, req, res, next) => {
+  // Malformed JSON bodies used to surface as a generic 500; they are a bad
+  // request, so answer 400 in the same {success,data,message} contract.
+  // (body-parser marks them with status 400 + entity.parse.failed.)
+  if (err && err.status === 400 && err.type === 'entity.parse.failed') {
+    return fail(res, 400, 'Invalid request body.');
+  }
   logger.error('Unhandled error', { reqId: req && req.id, route: req && req.path });
   return fail(res, 500, 'Something went wrong.');
 });
